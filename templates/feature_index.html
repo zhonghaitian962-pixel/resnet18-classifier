@@ -1,0 +1,3894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>物体识别 Demo · ResNet18 唱片机</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050816;
+      --card: rgba(20, 24, 40, 0.78);
+      --card-hover: rgba(30, 36, 56, 0.85);
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --border: #334155;
+      --wood: #4a2f1a;
+      --wood-dark: #2d1a0d;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(ellipse at top, #0a1030 0%, var(--bg) 60%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1rem;
+      overflow-x: hidden;
+      transition: background 1.2s ease;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+    }
+    body[data-scene="starry"] {
+      background: radial-gradient(ellipse at top, #0a1030 0%, var(--bg) 60%);
+    }
+    body[data-scene="forest"] {
+      background: radial-gradient(ellipse at top, #1f3a1a 0%, #0a1a08 75%);
+    }
+    body[data-scene="ocean"] {
+      background: linear-gradient(180deg, #6ec1e4 0%, #2a6da5 45%, #0f3357 80%);
+    }
+
+    /* 星空背景 */
+    #starfield {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: auto;
+    }
+
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .header h1 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      background: linear-gradient(90deg, #ef4444 0%, #f97316 14%, #facc15 28%, #22c55e 42%, #06b6d4 56%, #3b82f6 70%, #a855f7 84%, #ffffff 92%, #ef4444 100%);
+      background-size: 250% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: #a855f7;
+      animation: titleShine 3s linear infinite;
+      filter: drop-shadow(0 0 8px rgba(236,72,153,0.45));
+    }
+    @keyframes titleShine {
+      0%   { background-position: 250% center; }
+      100% { background-position: -250% center; }
+    }
+    .header p { color: var(--muted); font-size: 0.85rem; }
+
+    /* ===================== 唱片机机身 ===================== */
+    .turntable-body {
+      position: relative;
+      height: 360px;
+      background:
+        linear-gradient(135deg, var(--wood) 0%, var(--wood-dark) 100%);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow:
+        inset 0 2px 0 rgba(255,255,255,0.08),
+        inset 0 -2px 8px rgba(0,0,0,0.5),
+        0 18px 40px rgba(0,0,0,0.6);
+      border: 1px solid #1a0f08;
+      overflow: hidden;
+    }
+    /* 木纹细节 */
+    .turntable-body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(90deg,
+          rgba(0,0,0,0.04) 0px, rgba(0,0,0,0.04) 2px,
+          transparent 2px, transparent 28px),
+        repeating-linear-gradient(90deg,
+          rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px,
+          transparent 1px, transparent 7px);
+      pointer-events: none;
+    }
+    /* 控制按钮装饰条 */
+    .turntable-body::after {
+      content: '';
+      position: absolute;
+      bottom: 14px; left: 50%;
+      transform: translateX(-50%);
+      width: 80px; height: 6px;
+      background: linear-gradient(90deg, #2a2a2a, #1a1a1a);
+      border-radius: 3px;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+    }
+
+    /* ----- 唱片架背景 ----- */
+    .vinyl-rack-bg {
+      position: absolute;
+      left: 12px; top: 12px; bottom: 12px;
+      width: 116px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.4));
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.5);
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+    }
+
+    /* ----- 黑胶唱片 ----- */
+    .vinyl {
+      position: absolute;
+      width: 96px; height: 96px;
+      border-radius: 50%;
+      cursor: pointer;
+      background: repeating-radial-gradient(circle at center,
+        #050505 0, #050505 1.5px,
+        #1c1c1c 2px, #1c1c1c 3px);
+      box-shadow:
+        0 4px 10px rgba(0,0,0,0.6),
+        inset 0 0 0 1px rgba(255,255,255,0.05);
+      transition:
+        top 0.45s cubic-bezier(0.34, 1.4, 0.64, 1),
+        left 0.45s cubic-bezier(0.34, 1.4, 0.64, 1),
+        width 0.45s cubic-bezier(0.34, 1.4, 0.64, 1),
+        height 0.45s cubic-bezier(0.34, 1.4, 0.64, 1),
+        box-shadow 0.4s;
+      z-index: 3;
+    }
+    .vinyl::before {
+      content: '';
+      position: absolute;
+      inset: 30%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 35%, rgba(255,255,255,0.45), transparent 55%),
+        radial-gradient(circle at 35% 35%, var(--tag), var(--tag) 70%);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.4), inset 0 0 6px rgba(0,0,0,0.3);
+    }
+    .vinyl::after {
+      content: '';
+      position: absolute;
+      inset: 47%;
+      border-radius: 50%;
+      background: #0a0a0a;
+      box-shadow: 0 0 0 1px #555;
+    }
+    .vinyl-tag {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a1a1a;
+      font-size: 0.7rem;
+      font-weight: 700;
+      z-index: 3;
+      pointer-events: none;
+      letter-spacing: 0.1em;
+      background: linear-gradient(to bottom,
+        #fafafa 0%, #ffffff 30%, #e8e8e8 50%, #ffffff 70%, #f0f0f0 100%);
+      border-top: 1px solid #bbb;
+      border-bottom: 1px solid #bbb;
+      box-shadow:
+        0 0 4px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.8),
+        inset 0 -1px 0 rgba(0,0,0,0.1);
+      white-space: nowrap;
+      transition: opacity 0.4s ease;
+    }
+    .vinyl.active .vinyl-tag { opacity: 0; }
+
+    /* 三张唱片默认位置（左侧架子上垂直排列）*/
+    .vinyl-red    { --tag: #e74c3c; }
+    .vinyl-blue   { --tag: #3498db; }
+    .vinyl-green  { --tag: #27ae60; }
+    /* 唱片中心霓虹花纹：多色渐变放射光线 + 发光 + 色相流动 + 闪烁 */
+    .vinyl-glyph {
+      position: absolute;
+      inset: 30%;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg,
+        #ff006e 0deg, #8338ec 60deg, #3a86ff 120deg,
+        #06ffa5 180deg, #ffbe0b 240deg, #ff006e 360deg);
+      /* 用 mask 裁出放射光线花纹 */
+      -webkit-mask: repeating-conic-gradient(from 0deg,
+        #000 0deg 1.5deg, transparent 1.5deg 6deg);
+      mask: repeating-conic-gradient(from 0deg,
+        #000 0deg 1.5deg, transparent 1.5deg 6deg);
+      pointer-events: none;
+      animation: neonFlow 5s linear infinite, glyphFlash 2.2s ease-in-out infinite;
+    }
+    @keyframes neonFlow {
+      0%   { filter: drop-shadow(0 0 3px #ff006e) drop-shadow(0 0 7px #8338ec) hue-rotate(0deg); }
+      100% { filter: drop-shadow(0 0 3px #ff006e) drop-shadow(0 0 7px #8338ec) hue-rotate(360deg); }
+    }
+    @keyframes glyphFlash {
+      0%, 100% { opacity: 0.3; }
+      50%      { opacity: 1; }
+    }
+    .vinyl[data-tab="register"]  { top: 22px;  left: 22px; }
+    .vinyl[data-tab="recognize"] { top: 130px; left: 22px; }
+    .vinyl[data-tab="database"]  { top: 238px; left: 22px; }
+
+    .vinyl:hover {
+      box-shadow:
+        0 6px 14px rgba(0,0,0,0.7),
+        0 0 18px var(--tag);
+    }
+
+    /* active: 唱片飞到转盘中心并放大旋转
+       platter 中心 x = 100% - 40(deck right) - 120(platter 半宽) = 100% - 160
+       vinyl 中心 x = left + 110(width/2)，要让二者重合：left = 100% - 270 */
+    .vinyl.active {
+      top: 30px;
+      left: calc(100% - 270px);
+      width: 220px;
+      height: 220px;
+      z-index: 5;
+      box-shadow:
+        0 10px 30px rgba(0,0,0,0.7),
+        0 0 50px var(--tag),
+        inset 0 0 0 1px rgba(255,255,255,0.08);
+      animation: vinyl-spin var(--vinyl-spin-dur, 4s) linear infinite;
+    }
+    @keyframes vinyl-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* ----- 转盘 platter ----- */
+    .deck {
+      position: absolute;
+      right: 40px;
+      top: 20px;
+      width: 240px; height: 240px;
+      z-index: 2;
+    }
+    .platter {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 30%,
+          #3a3a3a 0%, #1a1a1a 60%, #0a0a0a 100%);
+      border: 3px solid #4a4a4a;
+      box-shadow:
+        inset 0 0 30px rgba(0,0,0,0.9),
+        0 4px 12px rgba(0,0,0,0.5);
+      position: relative;
+    }
+    .platter::before {
+      /* 转盘纹路 */
+      content: '';
+      position: absolute;
+      inset: 8%;
+      border-radius: 50%;
+      background: repeating-radial-gradient(circle at center,
+        rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px,
+        transparent 2px, transparent 4px);
+    }
+    .platter::after {
+      /* 中心轴 */
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 12px; height: 12px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, #ccc, #666);
+      box-shadow: 0 0 0 1px #222, 0 1px 3px rgba(0,0,0,0.8);
+      z-index: 4;
+    }
+
+    /* ----- 唱臂 ----- */
+    .tonearm {
+      position: absolute;
+      top: -6px;
+      right: 18px;
+      width: 7px;
+      height: 170px;
+      background: linear-gradient(to bottom, #d4d4d4, #888, #555);
+      border-radius: 4px;
+      transform-origin: top center;
+      transform: rotate(0deg) translateX(50px);
+      transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.64, 1);
+      z-index: 6;
+      box-shadow: 1px 0 3px rgba(0,0,0,0.5);
+    }
+    .tonearm::before {
+      /* 顶部支点 */
+      content: '';
+      position: absolute;
+      top: -10px; left: -6px;
+      width: 19px; height: 19px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #d4d4d4, #555);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    .tonearm::after {
+      /* 唱头 */
+      content: '';
+      position: absolute;
+      bottom: -14px; left: -10px;
+      width: 26px; height: 18px;
+      background: linear-gradient(180deg, #2a2a2a, #0f0f0f);
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    }
+    /* 当有 active 唱片时，唱臂下沉到唱片 */
+    .turntable-body:has(.vinyl.active) .tonearm {
+      transform: rotate(38deg);
+    }
+
+    /* ===================== B 方案：中部 LCD 屏 + 旋钮 ===================== */
+    .lcd-deck {
+      position: absolute;
+      left: 140px; right: 340px;
+      top: 24px; bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      z-index: 1;
+    }
+    .lcd-screen {
+      width: 100%; max-width: 320px;
+      background: #051914;
+      border: 3px solid var(--led-color, #2a3a25);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow:
+        inset 0 0 var(--lcd-inset, 30px) rgba(0,255,150,0.08),
+        0 4px 12px rgba(0,0,0,0.5),
+        0 0 0 1px rgba(255,255,255,0.03),
+        0 0 24px var(--led-color, transparent);
+      position: relative;
+      overflow: hidden;
+      min-height: 96px;
+      transition: border-color 0.6s ease, box-shadow 0.6s ease;
+    }
+    /* LED 指示灯 */
+    .led-indicator {
+      position: absolute;
+      top: 8px; right: 10px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--led-color, #4ade80);
+      box-shadow: 0 0 10px var(--led-color, #4ade80);
+      animation: led-pulse 2s ease-in-out infinite;
+      transition: background 0.6s ease, box-shadow 0.6s ease;
+    }
+    @keyframes led-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .lcd-screen::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg,
+        rgba(0,255,150,0.04) 0px, rgba(0,255,150,0.04) 1px,
+        transparent 1px, transparent 3px);
+      pointer-events: none;
+    }
+    /* LCD 熄灭态（无唱片在转盘时）*/
+    .lcd-screen.off {
+      background: #050505;
+      border-color: #1a1a1a;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.6);
+    }
+    .lcd-screen.off .lcd-row { color: rgba(255,255,255,0.05); text-shadow: none; }
+    .lcd-screen.off::before { opacity: 0; }
+    .lcd-row {
+      font-family: "Courier New", "Consolas", monospace;
+      color: var(--led-color, #4ade80);
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 var(--lcd-glow, 6px) var(--led-color, #4ade80);
+      transition: color 0.6s ease, text-shadow 0.6s ease;
+      line-height: 1.6;
+      position: relative;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lcd-row.l1 { font-size: 10px; opacity: 0.75; }
+    .lcd-row.l2 { font-size: 15px; font-weight: bold; margin: 2px 0; }
+    .lcd-row.l3 { font-size: 10px; opacity: 0.75; }
+    .lcd-row.l4 { font-size: 10px; opacity: 0.9; margin-top: 4px; }
+    .lcd-blink { animation: lcd-blink 1.2s steps(2) infinite; }
+    @keyframes lcd-blink { 50% { opacity: 0; } }
+
+    /* 旋钮组 */
+    .knobs {
+      display: flex; gap: 14px;
+    }
+    .knob-wrap { text-align: center; }
+    .knob {
+      width: 44px; height: 44px;
+      background: radial-gradient(circle at 30% 30%, #5a4a3a, #1a0f08);
+      border-radius: 50%;
+      border: 2px solid #2a1810;
+      box-shadow:
+        0 4px 10px rgba(0,0,0,0.5),
+        inset 0 -3px 6px rgba(0,0,0,0.4),
+        inset 0 2px 3px rgba(255,255,255,0.05);
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.4s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    .knob::before {
+      content: '';
+      position: absolute;
+      top: 5px; left: 50%; transform: translateX(-50%);
+      width: 3px; height: 10px;
+      background: #d4af37;
+      border-radius: 2px;
+      box-shadow: 0 0 4px rgba(212,175,55,0.6);
+    }
+    .knob:hover { transform: rotate(60deg); }
+    .knob-label {
+      font-size: 8px;
+      color: #94a3b8;
+      margin-top: 3px;
+      letter-spacing: 0.1em;
+    }
+
+    /* 小屏隐藏 LCD 区 */
+    @media (max-width: 720px) {
+      .lcd-deck { display: none; }
+    }
+
+    /* ----- 配重 ----- */
+    .counterweight {
+      position: absolute;
+      top: -16px; right: 8px;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #888, #2a2a2a);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 -2px 4px rgba(0,0,0,0.5);
+      z-index: 7;
+    }
+
+    /* ===================== 内容面板 ===================== */
+    .panels {
+      margin-top: 1.5rem;
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height 0.5s ease, opacity 0.4s ease, margin 0.4s ease;
+      margin-top: 0;
+    }
+    .panels.open {
+      max-height: 2000px;
+      opacity: 1;
+      margin-top: 1.5rem;
+    }
+    .panel {
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem 48px 1.5rem 1.5rem;
+      display: none;
+      animation: panel-in 0.5s ease;
+      position: relative;
+    }
+    .panel.active { display: block; }
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* 卡片关闭按钮 */
+    .panel-close {
+      position: absolute;
+      top: 10px; right: 10px;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(239,68,68,0.25);
+      border: 1px solid rgba(239,68,68,0.5);
+      color: #fca5a5;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; line-height: 1;
+      transition: all 0.2s;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .panel-close:hover { background: rgba(239,68,68,0.45); transform: rotate(90deg); }
+    /* 卡片子模式（旋钮触发）*/
+    .card-mode {
+      display: none;
+      animation: panel-in 0.4s ease;
+    }
+    .card-mode.active { display: block; }
+    .card-mode-title {
+      display: inline-block;
+      font-size: 10px;
+      color: #a5b4fc;
+      background: rgba(99,102,241,0.15);
+      padding: 3px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ===================== Panel 主题装饰 ===================== */
+    .panel.theme-galaxy,
+    .panel.theme-forest,
+    .panel.theme-beach {
+      position: relative;
+      overflow: visible;
+    }
+    .panel-deco {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: visible;
+    }
+    .panel-deco svg { position: absolute; }
+    .panel > *:not(.panel-deco) { position: relative; z-index: 1; }
+
+    /* 银河：星星闪烁 */
+    .deco-star { animation: deco-twinkle 3s ease-in-out infinite; }
+    .deco-star.delay-1 { animation-delay: 0.6s; }
+    .deco-star.delay-2 { animation-delay: 1.2s; }
+    .deco-star.delay-3 { animation-delay: 1.8s; }
+    @keyframes deco-twinkle {
+      0%, 100% { opacity: 0.5; transform: scale(1) rotate(0deg); }
+      50% { opacity: 1; transform: scale(1.15) rotate(8deg); }
+    }
+    .deco-shooting { animation: deco-shoot 6s ease-in infinite; }
+    @keyframes deco-shoot {
+      0% { opacity: 0; transform: translate(0,0); }
+      8% { opacity: 1; }
+      20% { opacity: 1; transform: translate(60px, 30px); }
+      25%, 100% { opacity: 0; transform: translate(60px, 30px); }
+    }
+    .deco-moon { animation: deco-glow 4s ease-in-out infinite; }
+    @keyframes deco-glow {
+      0%, 100% { filter: drop-shadow(0 0 4px rgba(253,230,138,0.4)); }
+      50% { filter: drop-shadow(0 0 10px rgba(253,230,138,0.7)); }
+    }
+
+    /* 深林：藤蔓摆动 */
+    .deco-vine { animation: deco-sway 6s ease-in-out infinite; transform-origin: top center; }
+    @keyframes deco-sway {
+      0%, 100% { transform: rotate(-1deg); }
+      50% { transform: rotate(1.5deg); }
+    }
+    .deco-leaf-spin { animation: deco-float 5s ease-in-out infinite; }
+    @keyframes deco-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-3px) rotate(8deg); }
+    }
+
+    /* 海滩：贝壳呼吸 + 波浪滚动 */
+    .deco-shell { animation: deco-breathe 4s ease-in-out infinite; }
+    @keyframes deco-breathe {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px rgba(251,191,36,0.3)); }
+      50% { transform: scale(1.08); filter: drop-shadow(0 0 8px rgba(251,191,36,0.5)); }
+    }
+    .deco-starfish { animation: deco-spin 12s linear infinite; transform-origin: center; }
+    @keyframes deco-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* —— 银河主题（录入）—— */
+    .panel.theme-galaxy {
+      background:
+        radial-gradient(ellipse at top right, rgba(168,85,247,0.14), transparent 55%),
+        radial-gradient(ellipse at bottom left, rgba(99,102,241,0.1), transparent 55%),
+        var(--card);
+      border-color: rgba(168,85,247,0.3);
+      box-shadow: 0 0 30px rgba(168,85,247,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    .panel.theme-galaxy::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, #a855f7, #6366f1, #c084fc, transparent);
+      box-shadow: 0 0 14px rgba(168,85,247,0.7);
+    }
+    .panel.theme-galaxy::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(255,255,255,0.6) 0.5px, transparent 1px),
+        radial-gradient(circle, rgba(196,181,253,0.5) 0.5px, transparent 1px),
+        radial-gradient(circle, rgba(165,180,252,0.4) 0.5px, transparent 1px);
+      background-size: 90px 90px, 130px 130px, 70px 70px;
+      background-position: 10px 25px, 55px 80px, 30px 60px;
+      pointer-events: none;
+      opacity: 0.5;
+      animation: galaxy-twinkle 4s ease-in-out infinite;
+    }
+    @keyframes galaxy-twinkle {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.85; }
+    }
+    .panel.theme-galaxy h2 {
+      background: linear-gradient(90deg, #c4b5fd, #a78bfa, #818cf8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* —— 深林主题（识别）—— */
+    .panel.theme-forest {
+      background:
+        radial-gradient(ellipse at top left, rgba(34,197,94,0.12), transparent 55%),
+        radial-gradient(ellipse at bottom right, rgba(132,204,22,0.08), transparent 55%),
+        var(--card);
+      border-color: rgba(34,197,94,0.3);
+      box-shadow: 0 0 30px rgba(34,197,94,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    .panel.theme-forest::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, #22c55e, #84cc16, #4ade80, transparent);
+      box-shadow: 0 0 14px rgba(34,197,94,0.7);
+    }
+    .panel.theme-forest::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 12% 88%, rgba(34,197,94,0.18), transparent 22%),
+        radial-gradient(circle at 88% 12%, rgba(132,204,22,0.14), transparent 22%),
+        radial-gradient(circle at 70% 70%, rgba(74,222,128,0.1), transparent 18%);
+      pointer-events: none;
+    }
+    .panel.theme-forest h2 {
+      background: linear-gradient(90deg, #86efac, #4ade80, #65a30d);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* —— 海滩主题（特征库）—— */
+    .panel.theme-beach {
+      background:
+        radial-gradient(ellipse at top right, rgba(56,189,248,0.12), transparent 55%),
+        linear-gradient(180deg, transparent 65%, rgba(56,189,248,0.1) 100%),
+        var(--card);
+      border-color: rgba(56,189,248,0.3);
+      box-shadow: 0 0 30px rgba(56,189,248,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    .panel.theme-beach::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, #0ea5e9, #06b6d4, #38bdf8, transparent);
+      box-shadow: 0 0 14px rgba(56,189,248,0.7);
+    }
+    .panel.theme-beach::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0; height: 40px;
+      background:
+        radial-gradient(ellipse 60% 100% at 50% 100%, rgba(56,189,248,0.35), transparent 70%),
+        radial-gradient(ellipse 40% 80% at 30% 100%, rgba(6,182,212,0.25), transparent 70%),
+        radial-gradient(ellipse 40% 80% at 70% 100%, rgba(125,211,252,0.2), transparent 70%);
+      pointer-events: none;
+    }
+    .panel.theme-beach h2 {
+      background: linear-gradient(90deg, #7dd3fc, #38bdf8, #06b6d4);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .panel h2 {
+      font-size: 1.15rem;
+      margin-bottom: 0.4rem;
+      color: var(--accent-hover);
+    }
+    .panel .desc { color: var(--muted); font-size: 0.82rem; margin-bottom: 1.25rem; }
+
+    /* Form elements */
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input[type="text"] {
+      width: 100%;
+      background: rgba(5, 8, 22, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.18), 0 0 20px rgba(99,102,241,0.1);
+    }
+    input[type="text"]::placeholder { color: rgba(148,163,184,0.45); }
+
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-end;
+    }
+    .input-group input[type="text"] { flex: 1; }
+
+    .drop-zone {
+      border: 1.5px dashed rgba(99,102,241,0.25);
+      border-radius: 14px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      margin-top: 0.75rem;
+      background:
+        radial-gradient(ellipse at center, rgba(99,102,241,0.06), transparent 70%),
+        linear-gradient(180deg, rgba(99,102,241,0.02), transparent);
+      backdrop-filter: blur(4px);
+    }
+    .drop-zone:hover {
+      border-color: rgba(99,102,241,0.55);
+      background:
+        radial-gradient(ellipse at center, rgba(99,102,241,0.12), transparent 70%),
+        linear-gradient(180deg, rgba(99,102,241,0.05), transparent);
+      transform: translateY(-1px);
+    }
+    .drop-zone.dragover {
+      border-color: var(--accent-hover);
+      border-style: solid;
+      background:
+        radial-gradient(ellipse at center, rgba(99,102,241,0.2), transparent 70%),
+        linear-gradient(180deg, rgba(99,102,241,0.08), transparent);
+      transform: scale(1.015);
+      box-shadow: 0 0 30px rgba(99,102,241,0.25), inset 0 0 20px rgba(99,102,241,0.1);
+    }
+    .drop-zone:hover .icon-svg { transform: translateY(-3px) scale(1.05); }
+    .drop-zone .hint { color: rgba(148,163,184,0.5); font-size: 0.7rem; margin-top: 0.35rem; }
+    .drop-zone p { color: var(--muted); font-size: 0.82rem; }
+    .drop-zone .filenames {
+      color: var(--text);
+      font-size: 0.78rem;
+      margin-top: 0.5rem;
+      padding: 0.35rem 0.6rem;
+      background: rgba(99,102,241,0.08);
+      border-radius: 6px;
+      max-height: 60px;
+      overflow-y: auto;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; width: 100%; height: 100%;
+      top: 0; left: 0; opacity: 0; cursor: pointer;
+    }
+
+    .drop-preview { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; border-radius:14px; display:none; z-index:1; background:rgba(0,0,0,0.4); }
+    .drop-preview.show { display:block; }
+    .preview-grid {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+    .object-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:.6rem; margin:.5rem 0; }
+    .object-card { padding:.75rem .5rem; border-radius:10px; border:1.5px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); cursor:pointer; text-align:center; transition:all .2s; }
+    .object-card:hover { border-color:#22d3ee; background:rgba(34,211,238,0.08); transform:translateY(-2px); }
+    .object-card.selected { border-color:#22d3ee; background:rgba(34,211,238,0.18); box-shadow:0 0 0 2px #22d3ee; }
+    .object-card .obj-name { font-weight:600; font-size:.9rem; color:#e2e8f0; margin-bottom:.2rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .object-card .obj-count { font-size:.72rem; color:#94a3b8; }
+    .object-card.empty { grid-column:1/-1; cursor:default; color:#94a3b8; }
+    .object-card.empty:hover { transform:none; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.12); }
+    .preview-grid img {
+      width: 70px; height: 70px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 1rem;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(99,102,241,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+      transition: left 0.6s;
+    }
+    .btn-primary:hover::before { left: 100%; }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled {
+      background: var(--border);
+      cursor: not-allowed;
+      opacity: 0.6;
+      box-shadow: none;
+      transform: none;
+    }
+    .btn-voice {
+      background: rgba(99,102,241,0.1);
+      border: 1px solid var(--border);
+      color: var(--accent-hover);
+      width: auto;
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      margin-top: 0;
+    }
+    .btn-voice:hover { border-color: var(--accent); background: rgba(99,102,241,0.2); }
+    .btn-voice.recording {
+      background: var(--danger);
+      color: #fff;
+      border-color: var(--danger);
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* Camera */
+    .camera-section { margin-bottom: 1rem; }
+    .camera-section video {
+      width: 100%;
+      max-height: 320px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #000;
+      display: none;
+    }
+    .camera-section video.show { display: block; }
+    #reg-video-live {
+      width: 100%;
+      max-height: 320px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #000;
+      display: block;
+    }
+    .cam-controls { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .cam-controls .btn { margin-top: 0; flex: 1; }
+    .cam-divider {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0.5rem 0;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+    .cam-divider::before, .cam-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Result */
+    .result-box {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 10px;
+      display: none;
+    }
+    .result-box.show { display: block; }
+    .result-box.success {
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.3);
+    }
+    .result-box.unknown {
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+    .result-box.error {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .result-box .result-text { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .result-box.success .result-text { color: #86efac; }
+    .result-box.unknown .result-text { color: #fcd34d; }
+    .result-box.error .result-text { color: #fca5a5; }
+
+    .top3 { margin-top: 0.75rem; }
+    .top3-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .top3-item:last-child { border-bottom: none; }
+    .top3-item .name { font-size: 0.9rem; }
+    .top3-item .sim { font-size: 0.88rem; font-weight: 700; color: var(--accent-hover); font-variant-numeric: tabular-nums; }
+    .sim-bar {
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 0.3rem;
+    }
+    .sim-bar .fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 999px;
+      transition: width 0.6s ease;
+    }
+    .result-preview {
+      max-width: 100%;
+      max-height: 220px;
+      border-radius: 8px;
+      margin-top: 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    /* Database table */
+    .db-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .db-table th {
+      text-align: left;
+      padding: 0.7rem 0.9rem;
+      background: linear-gradient(180deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04));
+      color: var(--accent-hover);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .db-table td {
+      padding: 0.75rem 0.9rem;
+      border-bottom: 1px solid rgba(51,65,85,0.5);
+      font-size: 0.88rem;
+      transition: background 0.2s;
+    }
+    .db-table tbody tr { transition: background 0.2s; }
+    .db-table tbody tr:hover td { background: rgba(99,102,241,0.08); }
+    .db-table tbody tr:last-child td { border-bottom: none; }
+    .db-table td:first-child { font-weight: 600; color: #fff; }
+    .db-table td:nth-child(2) {
+      font-variant-numeric: tabular-nums;
+      color: var(--accent-hover);
+      font-weight: 600;
+    }
+    .db-img-grid {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      /* 图片较多时限制高度并内部滚动，避免撑高整行、影响其他词条 */
+      max-height: 168px; overflow-y: auto; overflow-x: hidden;
+      padding: 8px 8px 4px 4px;
+    }
+    .db-img-grid::-webkit-scrollbar { width: 6px; }
+    .db-img-grid::-webkit-scrollbar-track { background: transparent; }
+    .db-img-grid::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.22); border-radius: 3px;
+    }
+    .db-img-grid::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+    .db-img-cell-inner {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .db-img-wrap { position: relative; display: inline-block; }
+    .db-thumb {
+      width: 72px; height: 72px; object-fit: cover;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);
+      display: block;
+    }
+    .db-img-del {
+      position: absolute; top: -6px; right: -6px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #ef4444; color: #fff; border: none;
+      font-size: 14px; line-height: 1; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .db-img-del:hover { background: #dc2626; }
+    .db-img-add {
+      width: 72px; height: 72px; border-radius: 8px;
+      border: 2px dashed rgba(255,255,255,0.3); background: rgba(255,255,255,0.05);
+      color: var(--muted); font-size: 28px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .db-img-add:hover { border-color: var(--accent); color: var(--accent); }
+    .db-thumb-placeholder {
+      width: 64px; height: 64px; margin: 0 auto;
+      border-radius: 8px; border: 1px dashed rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 0.75rem;
+    }
+    /* 添加图片弹窗 */
+    .addimg-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 9999; display: flex; align-items: center; justify-content: center;
+    }
+    .addimg-panel {
+      background: var(--panel-bg, #1a1a2e); color: #fff;
+      padding: 1.5rem; border-radius: 12px; max-width: 480px; width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .addimg-panel h3 { margin: 0 0 1rem 0; }
+    .addimg-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .addimg-actions { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end; }
+    .db-empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 2.5rem 1rem;
+      font-size: 0.88rem;
+    }
+    .btn-delete {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border: none;
+      color: #fff;
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: auto;
+      margin: 0;
+      box-shadow: 0 2px 8px rgba(239,68,68,0.25);
+      transition: all 0.2s;
+    }
+    .btn-delete:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(239,68,68,0.4);
+    }
+    .btn-delete:active { transform: translateY(0); }
+    .btn-delete .icon { width: 0.95em; height: 0.95em; margin: 0; }
+
+    /* ====== 水漩涡删除动画 ====== */
+    .vortex-stage {
+      position: fixed;
+      z-index: 2147483000;          /* 层级最高，盖住一切 */
+      pointer-events: none;
+      width: 55vmax;
+      height: 55vmax;              /* 吞噬时占据屏幕上半部分 */
+      transform: translate(-50%, -50%) scale(0.25);
+      opacity: 0;
+      transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .vortex-stage.active {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .vortex-stage > * {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+    }
+    /* 水面底色：让漩涡在屏幕上半部分呈现为一片被抽入的深蓝水面 */
+    .vortex-backdrop {
+      background: radial-gradient(circle at center,
+        rgba(3,7,18,0.92) 0%,
+        rgba(12,74,110,0.55) 22%,
+        rgba(8,47,73,0.62) 40%,
+        rgba(8,47,73,0.38) 62%,
+        rgba(3,7,18,0.18) 80%,
+        transparent 92%);
+      filter: blur(1px);
+    }
+    .v-ring.r1 {
+      background: conic-gradient(from 0deg, rgba(56,189,248,0), rgba(56,189,248,0.6), rgba(125,211,252,0.2), rgba(56,189,248,0.65), rgba(56,189,248,0));
+      -webkit-mask: radial-gradient(circle, transparent 34%, #000 40%, #000 78%, transparent 100%);
+              mask: radial-gradient(circle, transparent 34%, #000 40%, #000 78%, transparent 100%);
+      filter: blur(0.5px);
+      animation: vortex-spin 1.6s linear infinite;
+    }
+    .v-ring.r2 {
+      inset: 9%;
+      background: conic-gradient(from 90deg, rgba(14,165,233,0), rgba(14,165,233,0.75), rgba(56,189,248,0.18), rgba(14,165,233,0.7), rgba(14,165,233,0));
+      -webkit-mask: radial-gradient(circle, transparent 30%, #000 36%, #000 80%, transparent 100%);
+              mask: radial-gradient(circle, transparent 30%, #000 36%, #000 80%, transparent 100%);
+      animation: vortex-spin-rev 1.1s linear infinite;
+    }
+    .v-ring.r3 {
+      inset: 19%;
+      background: conic-gradient(from 180deg, rgba(125,211,252,0), rgba(125,211,252,0.9), rgba(56,189,248,0.12), rgba(125,211,252,0.8), rgba(125,211,252,0));
+      -webkit-mask: radial-gradient(circle, transparent 24%, #000 30%, #000 82%, transparent 100%);
+              mask: radial-gradient(circle, transparent 24%, #000 30%, #000 82%, transparent 100%);
+      animation: vortex-spin 0.75s linear infinite;
+    }
+    .vortex-drain {
+      inset: 31%;
+      background: radial-gradient(circle, rgba(0,0,0,0.98) 0%, rgba(3,7,18,0.95) 40%, rgba(8,47,73,0.6) 72%, transparent 100%);
+      box-shadow: 0 0 40px rgba(8,47,73,0.7), inset 0 0 26px rgba(56,189,248,0.22);
+    }
+    .vortex-ripple {
+      border: 2px solid rgba(56,189,248,0.45);
+      animation: vortex-ripple 1.6s ease-out infinite;
+    }
+    /* —— 浪花 / 泡沫：排水口边缘的飞溅水花、泡沫环与上升气泡 —— */
+    .vortex-foam {
+      position: fixed;
+      z-index: 2147483000;
+      pointer-events: none;
+      width: 280px;
+      height: 280px;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .vortex-foam .foam-ring {
+      position: absolute;
+      inset: 26%;
+      border-radius: 50%;
+      background: radial-gradient(circle, transparent 56%, rgba(255,255,255,0.6) 70%, rgba(186,230,253,0.38) 84%, transparent 96%);
+      filter: blur(1.2px);
+      animation: foam-pulse 1.3s ease-in-out infinite;
+    }
+    .vortex-foam .foam-ring.alt {
+      inset: 30%;
+      background: radial-gradient(circle, transparent 60%, rgba(224,242,254,0.45) 72%, transparent 92%);
+      animation: foam-pulse 1.7s ease-in-out infinite reverse;
+    }
+    .vortex-foam .v-spray {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 11px; height: 11px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fff 0%, rgba(186,230,253,0.9) 55%, transparent 100%);
+      transform: translate(-50%, -50%) rotate(var(--a, 0deg)) translateX(0);
+      opacity: 0;
+      filter: blur(0.3px);
+      animation: v-spray 1.25s ease-out infinite;
+      animation-delay: var(--d, 0s);
+    }
+    .vortex-foam .v-bubble {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: var(--bs, 6px); height: var(--bs, 6px);
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.95), rgba(186,230,253,0.4) 60%, transparent 100%);
+      transform: translate(-50%, -50%) rotate(var(--a, 0deg)) translateX(var(--r, 30px));
+      opacity: 0;
+      animation: v-bubble 2.2s ease-in-out infinite;
+      animation-delay: var(--d, 0s);
+    }
+    @keyframes foam-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50%      { transform: scale(1.13); opacity: 1; }
+    }
+    @keyframes v-spray {
+      0%   { transform: translate(-50%,-50%) rotate(var(--a)) translateX(38px) scale(0.6); opacity: 0; }
+      18%  { opacity: 1; }
+      100% { transform: translate(-50%,-50%) rotate(var(--a)) translateX(var(--m, 110px)) translateY(28px) scale(0.22); opacity: 0; }
+    }
+    @keyframes v-bubble {
+      0%   { transform: translate(-50%,-50%) rotate(var(--a)) translateX(var(--r, 30px)) scale(0.5); opacity: 0; }
+      30%  { opacity: 0.9; }
+      100% { transform: translate(-50%,-50%) rotate(var(--a)) translateX(calc(var(--r, 30px) + 26px)) scale(1.15); opacity: 0; }
+    }
+    .vortex-ghost {
+      position: fixed;
+      z-index: 2147483001;          /* 在漩涡之上，让词条被吸入的过程清晰可见 */
+      pointer-events: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.5rem 0.95rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: #fff;
+      background: linear-gradient(135deg, rgba(239,68,68,0.20), rgba(239,68,68,0.06));
+      border: 1px solid rgba(239,68,68,0.4);
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+      animation: vortex-suck 1.6s cubic-bezier(0.55, 0.06, 0.4, 1) forwards;
+      will-change: transform, opacity;
+    }
+    .vortex-ghost .g-count { opacity: 0.7; font-weight: 500; }
+    @keyframes vortex-spin { to { transform: rotate(360deg); } }
+    @keyframes vortex-spin-rev { to { transform: rotate(-360deg); } }
+    @keyframes vortex-ripple {
+      0%   { transform: scale(0.4); opacity: 0.85; }
+      100% { transform: scale(1.15); opacity: 0; }
+    }
+    /* 词条从原位一边旋转缩小一边飞入漩涡排水口 */
+    @keyframes vortex-suck {
+      0%   { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; filter: blur(0px); }
+      45%  { opacity: 1; filter: blur(0.5px); }
+      75%  { opacity: 0.6; filter: blur(1.5px); }
+      100% { transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, 0px))) scale(0.05) rotate(720deg); opacity: 0; filter: blur(3px); }
+    }
+    .db-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat-card {
+      background:
+        radial-gradient(ellipse at top right, rgba(99,102,241,0.12), transparent 60%),
+        rgba(5, 8, 22, 0.4);
+      border: 1px solid rgba(99,102,241,0.18);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: linear-gradient(180deg, var(--accent), #a855f7);
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 20px rgba(99,102,241,0.1);
+    }
+    .stat-card .stat-label {
+      color: var(--muted);
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .stat-card .stat-label .icon { width: 0.95em; height: 0.95em; margin: 0; opacity: 0.7; }
+    .stat-card .stat-value {
+      color: #fff;
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(90deg, #fff, #c7d2fe);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    @media (max-width: 720px) {
+      .turntable-body { height: auto; padding: 16px; }
+      .vinyl-rack-bg { display: none; }
+      .vinyl[data-tab="register"]  { top: 14px; left: 14px; }
+      .vinyl[data-tab="recognize"] { top: 14px; left: 124px; }
+      .vinyl[data-tab="database"]  { top: 14px; left: 234px; }
+      .vinyl.active {
+        top: 130px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 180px; height: 180px;
+        margin-left: 0;
+      }
+      .vinyl.active { left: 50%; margin-left: -90px; }
+      .deck {
+        right: 50%;
+        transform: translateX(50%);
+        top: 130px;
+        width: 200px; height: 200px;
+      }
+      .tonearm { right: 50%; margin-right: -100px; }
+    }
+
+    /* ===================== 图标 ===================== */
+    .icon {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      vertical-align: -0.15em;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      margin-right: 0.45em;
+      flex-shrink: 0;
+    }
+    .btn .icon, .btn-voice .icon { width: 1.1em; height: 1.1em; }
+    .drop-zone .icon-svg { font-size: 2.2rem; color: var(--accent-hover); margin-bottom: 0.4rem; display: block; }
+    .drop-zone .icon-svg .icon { width: 1em; height: 1em; margin: 0; }
+
+    /* ===================== 强化结果展示 ===================== */
+    .result-box {
+      margin-top: 1rem;
+      padding: 1.25rem;
+      border-radius: 12px;
+      display: none;
+      backdrop-filter: blur(8px);
+      animation: result-in 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+    @keyframes result-in {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .result-box.show { display: block; }
+    .result-box.success {
+      background: linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04));
+      border: 1px solid rgba(34,197,94,0.35);
+      box-shadow: 0 0 40px rgba(34,197,94,0.12), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .result-box.unknown {
+      background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04));
+      border: 1px solid rgba(245,158,11,0.35);
+      box-shadow: 0 0 40px rgba(245,158,11,0.1), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .result-box.error {
+      background: linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04));
+      border: 1px solid rgba(239,68,68,0.35);
+    }
+
+    .result-head {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.6rem;
+    }
+    .result-head .badge-icon {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .result-box.success .badge-icon { background: rgba(34,197,94,0.18); color: #86efac; }
+    .result-box.unknown .badge-icon { background: rgba(245,158,11,0.18); color: #fcd34d; }
+    .result-box.error .badge-icon { background: rgba(239,68,68,0.18); color: #fca5a5; }
+    .result-head .badge-icon .icon { width: 18px; height: 18px; margin: 0; }
+
+    .result-title { font-size: 0.82rem; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+    .result-text {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin: 0.15rem 0 0.5rem;
+      background: linear-gradient(90deg, #fff, #818cf8);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+    .result-sub { color: var(--muted); font-size: 0.82rem; margin-bottom: 0.6rem; }
+
+    .result-preview {
+      max-width: 100%;
+      max-height: 220px;
+      border-radius: 10px;
+      margin: 0.75rem 0;
+      border: 1px solid var(--border);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    .top3-section {
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px dashed var(--border);
+    }
+    .top3-section .section-title {
+      font-size: 0.74rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.6rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .top3 {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .top3-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.8rem;
+      background: rgba(5, 8, 22, 0.35);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 9px;
+      transition: all 0.25s;
+    }
+    .top3-item:hover {
+      background: rgba(5, 8, 22, 0.55);
+      border-color: rgba(99,102,241,0.25);
+      transform: translateX(2px);
+    }
+    .top3-item .rank {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .top3-item.rank-1 .rank {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      color: #1a1a08;
+      box-shadow: 0 0 12px rgba(251,191,36,0.5);
+    }
+    .top3-item.rank-2 .rank { background: rgba(148,163,184,0.2); color: #cbd5e1; }
+    .top3-item.rank-3 .rank { background: rgba(180,83,9,0.2); color: #fbbf24; }
+    .top3-item .info { flex: 1; min-width: 0; }
+    .top3-item .name { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .sim-bar {
+      width: 100%;
+      height: 5px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .sim-bar .fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.9s cubic-bezier(0.34, 1.2, 0.64, 1);
+      box-shadow: 0 0 8px rgba(99,102,241,0.4);
+    }
+    .top3-item.rank-1 .sim-bar .fill {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+      box-shadow: 0 0 8px rgba(251,191,36,0.5);
+    }
+    .top3-item .sim {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent-hover);
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+      min-width: 50px;
+      text-align: right;
+    }
+    .top3-item.rank-1 .sim { color: #fbbf24; }
+  </style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+
+<!-- SVG 图标 sprite (Lucide 风格) -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <defs>
+    <symbol id="icon-mic" viewBox="0 0 24 24">
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="12" x2="12" y1="19" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-mic-off" viewBox="0 0 24 24">
+      <line x1="2" x2="22" y1="2" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M5 10v2a7 7 0 0 0 12 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M9 9v1.34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-camera" viewBox="0 0 24 24">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="2"/>
+    </symbol>
+    <symbol id="icon-scan" viewBox="0 0 24 24">
+      <path d="M3 7V5a2 2 0 0 1 2-2h2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M17 3h2a2 2 0 0 1 2 2v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M21 17v2a2 2 0 0 1-2 2h-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M7 21H5a2 2 0 0 1-2-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="7" x2="17" y1="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="17 8 12 3 7 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="12" x2="12" y1="3" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24">
+      <rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+    </symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24">
+      <path d="M3 6h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="10" x2="10" y1="11" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="14" x2="14" y1="11" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-help" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="12" x2="12" y1="17" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="12" x2="12" y1="9" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" x2="12" y1="17" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-database" viewBox="0 0 24 24">
+      <ellipse cx="12" cy="5" rx="9" ry="3" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M3 5v14a9 3 0 0 0 18 0V5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 12a9 3 0 0 0 18 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="icon-trophy" viewBox="0 0 24 24">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M4 22h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="container">
+  <div class="header"><h1>黑胶唱片机 · 物体识别</h1></div>
+  <!-- ============ 唱片机机身 ============ -->
+  <div class="turntable-body">
+    <div class="vinyl-rack-bg"></div>
+
+    <!-- 三张黑胶唱片（也是 tab）-->
+    <div class="vinyl vinyl-red" data-tab="register" onclick="switchTab('register')"><span class="vinyl-glyph"></span></div>
+    <div class="vinyl vinyl-green" data-tab="recognize" onclick="switchTab('recognize')"><span class="vinyl-glyph"></span></div>
+    <div class="vinyl vinyl-blue" data-tab="database" onclick="switchTab('database')"><span class="vinyl-glyph"></span></div>
+
+    <!-- 转盘 + 唱臂 -->
+    <div class="deck">
+      <div class="platter"></div>
+    </div>
+    <div class="counterweight"></div>
+    <div class="tonearm"></div>
+
+    <!-- B 方案：中部 LCD 屏 + 旋钮 -->
+    <div class="lcd-deck">
+      <div class="lcd-screen">
+        <div class="led-indicator"></div>
+        <div class="lcd-row l1" id="lcd-l1">▶ NOW PLAYING · A 面</div>
+        <div class="lcd-row l2" id="lcd-l2">录入新物体</div>
+        <div class="lcd-row l3" id="lcd-l3">ResNet-18 · 512 维特征提取</div>
+        <div class="lcd-row l4" id="lcd-l4">[ ●REC ] status: ready<span class="lcd-blink">_</span></div>
+      </div>
+      <div class="knobs">
+        <div class="knob-wrap" data-knob="volume"><div class="knob"></div><div class="knob-label">VOLUME</div></div>
+        <div class="knob-wrap" data-knob="bass"><div class="knob"></div><div class="knob-label">BASS</div></div>
+        <div class="knob-wrap" data-knob="treble"><div class="knob"></div><div class="knob-label">TREBLE</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 内容面板 ============ -->
+  <div class="panels">
+
+    <!-- 录入物体 -->
+    <div class="panel active theme-galaxy" id="panel-register">
+      <div class="panel-deco" data-theme="galaxy"></div>
+      <h2>录入新物体</h2>
+      <p class="desc">输入物体名称，上传多张图片，系统将提取 ResNet-18 特征并保存到特征库</p>
+
+      <!-- 实时摄像头语音录入模式（左旋钮 VOLUME）-->
+      <div class="card-mode active" data-mode="live">
+        <div class="card-mode-title">🎥 实时摄像头语音录入</div>
+        <label>物体名称（语音输入或手动输入）</label>
+        <div class="input-group">
+          <input type="text" id="reg-name-live" placeholder="点右侧语音输入或手动输入" />
+          <button class="btn btn-voice" id="reg-voice-live-btn" onclick="startVoiceInput('reg-name-live')"><svg class="icon"><use href="#icon-mic"/></svg>语音</button>
+        </div>
+        <label style="margin-top:1rem;">摄像头实时画面</label>
+        <video id="reg-video-live" autoplay playsinline muted></video>
+        <div class="cam-controls">
+          <select id="reg-camera-select" style="flex:1;padding:0.5rem;border-radius:8px;background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border);">
+            <option value="">默认摄像头</option>
+          </select>
+          <button class="btn btn-primary" id="reg-cam-live-btn" onclick="toggleRegCamera()"><svg class="icon"><use href="#icon-camera"/></svg>开启摄像头</button>
+          <button class="btn btn-primary" id="reg-capture-live-btn" onclick="captureAndRegister()" style="display:none;"><svg class="icon"><use href="#icon-scan"/></svg>拍照录入</button>
+        </div>
+        <div class="result-box" id="reg-result-live"></div>
+      </div>
+
+      <!-- 语音录入模式（中旋钮 BASS）-->
+      <div class="card-mode" data-mode="voice">
+        <div class="card-mode-title">🎤 语音录入模式</div>
+        <label>物体名称（点右侧按钮语音输入）</label>
+        <div class="input-group">
+          <input type="text" id="reg-name" placeholder="例如：水杯、手机、钥匙..." />
+          <button class="btn btn-voice" id="reg-voice-btn" onclick="startVoiceInput('reg-name')">
+            <svg class="icon"><use href="#icon-mic"/></svg>语音输入
+          </button>
+        </div>
+        <label style="margin-top:0.75rem;">物体图片（至少1张，建议5张以上）</label>
+        <div class="drop-zone" id="reg-drop">
+          <div class="icon-svg"><svg class="icon"><use href="#icon-upload"/></svg></div>
+          <p>点击或拖拽图片到此处（可多选）</p>
+          <div class="hint">支持 JPG / PNG · 建议 5 张以上以提升识别精度</div>
+          <div class="filenames" id="reg-filenames"></div>
+          <img id="reg-drop-img" class="drop-preview" alt="预览" />
+          <input type="file" id="reg-files" accept="image/*" multiple />
+        </div>
+        <div class="preview-grid" id="reg-previews"></div>
+        <button class="btn btn-primary" id="reg-submit" onclick="registerObject()">录入物体</button>
+        <div class="result-box" id="reg-result"></div>
+      </div>
+
+      <!-- 文字录入模式（中旋钮 BASS）-->
+      <div class="card-mode" data-mode="text">
+        <div class="card-mode-title">⌨️ 文字录入模式</div>
+        <label>物体名称（手动输入）</label>
+        <div class="input-group">
+          <input type="text" id="reg-name-text" placeholder="例如：水杯、手机、钥匙..." />
+        </div>
+        <label style="margin-top:0.75rem;">物体图片</label>
+        <div class="drop-zone" id="reg-drop-text">
+          <div class="icon-svg"><svg class="icon"><use href="#icon-upload"/></svg></div>
+          <p>点击或拖拽图片到此处（可多选）</p>
+          <div class="hint">支持 JPG / PNG</div>
+          <div class="filenames" id="reg-filenames-text"></div>
+          <img id="reg-drop-text-img" class="drop-preview" alt="预览" />
+          <input type="file" id="reg-files-text" accept="image/*" multiple />
+        </div>
+        <div class="preview-grid" id="reg-previews-text"></div>
+        <button class="btn btn-primary" onclick="registerObjectMode('text')">录入物体</button>
+        <div class="result-box" id="reg-result-text"></div>
+      </div>
+
+      <!-- 批量录入模式（右旋钮 TREBLE）-->
+      <div class="card-mode" data-mode="batch">
+        <div class="card-mode-title">📦 批量录入模式</div>
+        <label>物体名称</label>
+        <div class="input-group">
+          <input type="text" id="reg-name-batch" placeholder="物体名称" />
+        </div>
+        <label style="margin-top:0.75rem;">物体图片（批量上传，建议 10 张以上不同角度）</label>
+        <div class="drop-zone" id="reg-drop-batch" style="border-color:#a855f7;background:rgba(168,85,247,0.05)">
+          <div class="icon-svg"><svg class="icon"><use href="#icon-upload"/></svg></div>
+          <p>拖拽多张图片到此处（推荐 10+ 张）</p>
+          <div class="hint">批量录入 · 多角度多光照 · 显著提升识别精度</div>
+          <div class="filenames" id="reg-filenames-batch"></div>
+          <img id="reg-drop-batch-img" class="drop-preview" alt="预览" />
+          <input type="file" id="reg-files-batch" accept="image/*" multiple />
+        </div>
+        <div class="preview-grid" id="reg-previews-batch"></div>
+        <button class="btn btn-primary" style="background:linear-gradient(135deg,#a855f7,#6366f1)" onclick="registerObjectMode('batch')">批量录入</button>
+        <div class="result-box" id="reg-result-batch"></div>
+      </div>
+    </div>
+
+    <!-- 识别物体 -->
+    <div class="panel theme-forest" id="panel-recognize">
+      <div class="panel-deco" data-theme="forest"></div>
+      <h2>识别物体</h2>
+      <p class="desc">用摄像头拍照或上传图片，系统在特征库中检索最相似的物体并用语音播报结果</p>
+
+      <!-- 摄像头识别模式（左旋钮 VOLUME）-->
+      <div class="card-mode active" data-mode="camera">
+        <div class="card-mode-title">📷 摄像头识别模式</div>
+        <div class="camera-section">
+          <video id="rec-video" autoplay playsinline muted></video>
+          <div class="cam-controls">
+            <select id="rec-camera-select" style="flex:1;padding:0.5rem;border-radius:8px;background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border);">
+              <option value="">默认摄像头</option>
+            </select>
+            <button class="btn btn-voice" id="rec-cam-btn" onclick="toggleCamera()"><svg class="icon"><use href="#icon-camera"/></svg>开启摄像头</button>
+            <button class="btn btn-primary" id="rec-capture-btn" onclick="captureAndRecognize()" style="display:none;"><svg class="icon"><use href="#icon-scan"/></svg>拍照识别</button>
+            <button class="btn btn-voice" id="voice-assist-btn" onclick="toggleVoiceAssistant()"><svg class="icon"><use href="#icon-mic"/></svg>语音助手</button>
+          </div>
+        </div>
+        <div class="result-box" id="rec-result"></div>
+      </div>
+
+      <!-- 图片上传识别模式（中旋钮 BASS）-->
+      <div class="card-mode" data-mode="upload">
+        <div class="card-mode-title">📁 图片上传识别模式</div>
+        <div class="drop-zone" id="rec-drop">
+          <div class="icon-svg"><svg class="icon"><use href="#icon-upload"/></svg></div>
+          <p>点击或拖拽图片到此处</p>
+          <div class="hint">支持 JPG / PNG · 单张不超过 5MB</div>
+          <img id="rec-drop-img" class="drop-preview" alt="预览" />
+          <input type="file" id="rec-files" accept="image/*" onchange="previewUploadFiles()" />
+        </div>
+        <div class="preview-grid" id="rec-previews"></div>
+        <button class="btn btn-primary" id="rec-submit" onclick="recognizeObject()">开始识别</button>
+        <div class="result-box" id="rec-result-upload"></div>
+      </div>
+    </div>
+
+    <!-- 特征库管理 -->
+    <div class="panel theme-beach" id="panel-database">
+      <div class="panel-deco" data-theme="beach"></div>
+      <h2>特征库管理</h2>
+      <p class="desc">查看已录入物体，或删除单个/全部物体</p>
+
+      <!-- 查看特征库模式（左旋钮 VOLUME）-->
+      <div class="card-mode active" data-mode="list">
+        <div class="card-mode-title">📊 查看特征库</div>
+        <div class="db-stats" id="db-stats"></div>
+        <table class="db-table" id="db-table"></table>
+      </div>
+
+      <!-- 补充图片模式（左旋钮 VOLUME）-->
+      <div class="card-mode" data-mode="add">
+        <div class="card-mode-title">➕ 为词条补充图片</div>
+        <label>选择已有物体（点击卡片选中）</label>
+        <div class="object-grid" id="add-name-grid"></div>
+        <input type="hidden" id="add-name" />
+        <label style="margin-top:1.25rem;">上传图片（可多选）</label>
+        <div class="drop-zone" id="add-drop" style="margin-top:.5rem">
+          <img id="add-drop-img" class="drop-preview" alt="预览" />
+          <input type="file" id="add-files" accept="image/*" multiple onchange="previewAddFiles()" />
+        </div>
+        <div class="preview-grid" id="add-previews"></div>
+        <button class="btn btn-primary" style="margin-top:1rem;width:100%" onclick="addImagesToObject()">提交补充图片</button>
+        <div class="result-box" id="add-result"></div>
+      </div>
+
+      <!-- 删除模式（中旋钮 BASS）-->
+      <div class="card-mode" data-mode="del">
+        <div class="card-mode-title">🗑️ 删除词条</div>
+        <p class="desc" style="margin-bottom:.75rem">点击右侧按钮删除对应词条</p>
+        <table class="db-table" id="db-del-table"></table>
+        <div class="result-box" id="db-del-result"></div>
+        <label style="margin-top:1.25rem;">清空整个特征库</label>
+        <button class="btn btn-primary" style="background:linear-gradient(135deg,#b91c1c,#7f1d1d);width:100%" onclick="clearDatabase()">⚠️ 清空全部特征库</button>
+        <div class="result-box" id="db-clear-result"></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ===================== 动态背景：星空 / 落叶深林 / 海浪沙滩 =====================
+const sceneCanvas = document.getElementById('starfield');
+const sceneCtx = sceneCanvas.getContext('2d');
+let currentScene = 'off', pendingScene = 'off', transitioning = false, transT = 0, lastTime = 0;
+let stars = [], leaves = [], bubbles = [], shootingStars = [], galaxyStars = [], asteroids = [], seagulls = [], sparkles = [], fireflies = [], vines = [];
+let sceneParticles = [], ripples = [];
+let sceneMouse = { x: -9999, y: -9999, active: false, clickX: 0, clickY: 0, clickTime: 0, clickScene: '' };
+let galaxyAngle = 0;
+
+function resizeCanvas() {
+  sceneCanvas.width = window.innerWidth;
+  sceneCanvas.height = window.innerHeight;
+  initParticles();
+}
+
+function initParticles() {
+  // 星空粒子
+  stars = Array.from({length: Math.floor((sceneCanvas.width * sceneCanvas.height) / 6000)}, () => ({
+    x: Math.random() * sceneCanvas.width,
+    y: Math.random() * sceneCanvas.height,
+    r: Math.random() * 1.4 + 0.3,
+    o: Math.random() * Math.PI * 2,
+    s: Math.random() * 0.025 + 0.005,
+    hue: Math.random() < 0.15 ? 220 : (Math.random() < 0.5 ? 260 : 0)
+  }));
+  // 落叶粒子
+  leaves = Array.from({length: 45}, () => ({
+    x: Math.random() * sceneCanvas.width,
+    y: Math.random() * sceneCanvas.height,
+    size: Math.random() * 8 + 5,
+    angle: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.04,
+    vy: Math.random() * 0.8 + 0.4,
+    vx: Math.random() * 0.4 - 0.2,
+    hue: 25 + Math.random() * 55,  // 黄到橙红
+    sway: Math.random() * Math.PI * 2,
+    swaySpeed: Math.random() * 0.02 + 0.008
+  }));
+  // 气泡
+  bubbles = Array.from({length: 35}, () => ({
+    x: Math.random() * sceneCanvas.width,
+    y: Math.random() * sceneCanvas.height,
+    r: Math.random() * 4 + 1.5,
+    vy: -(Math.random() * 0.5 + 0.2),
+    o: Math.random() * 0.4 + 0.3,
+    drift: Math.random() * Math.PI * 2
+  }));
+  // 银河系悬臂星点（3 条对数螺旋臂）
+  galaxyStars = [];
+  const gArms = 3;
+  for (let i = 0; i < 700; i++) {
+    const arm = i % gArms;
+    const t = Math.random();                       // 沿臂归一化位置 0~1
+    const baseAng = arm * (Math.PI * 2 / gArms);
+    const spiral = t * 4.2;                        // 螺旋扭转量
+    const jitter = (Math.random() - 0.5) * 0.35;
+    galaxyStars.push({
+      r: t,                                        // 归一化半径
+      a: baseAng + spiral + jitter,
+      size: Math.random() * 1.1 + 0.3,
+      o: Math.random() * 0.5 + 0.3,
+      hue: Math.random() < 0.2 ? 220 : (Math.random() < 0.5 ? 260 : 200)
+    });
+  }
+  // 漂浮的太空陨石
+  asteroids = Array.from({ length: 7 }, () => ({
+    x: Math.random() * sceneCanvas.width,
+    y: Math.random() * sceneCanvas.height,
+    size: Math.random() * 9 + 5,
+    vx: (Math.random() - 0.5) * 0.25,
+    vy: (Math.random() - 0.5) * 0.25,
+    rot: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.008,
+    verts: Array.from({ length: 8 }, () => 0.65 + Math.random() * 0.5)
+  }));
+  // 海鸥（飞翔）
+  seagulls = Array.from({ length: 3 }, (_, i) => ({
+    x: Math.random() * sceneCanvas.width,
+    y: sceneCanvas.height * (0.16 + i * 0.07),
+    baseY: sceneCanvas.height * (0.16 + i * 0.07),
+    targetY: sceneCanvas.height * (0.16 + i * 0.07),
+    vx: 0.3 + Math.random() * 0.4,
+    flap: Math.random() * Math.PI * 2,
+    bob: 0.8 + Math.random() * 0.6
+  }));
+  // 海面波光点
+  sparkles = Array.from({ length: 50 }, () => ({
+    x: Math.random() * sceneCanvas.width,
+    y: sceneCanvas.height * (0.64 + Math.random() * 0.16),
+    w: 2 + Math.random() * 4,
+    ph: Math.random() * Math.PI * 2
+  }));
+  // 萤火虫（漂浮 + 闪烁）
+  fireflies = Array.from({ length: 16 }, () => ({
+    x: Math.random() * sceneCanvas.width,
+    y: sceneCanvas.height * (0.2 + Math.random() * 0.6),
+    vx: (Math.random() - 0.5) * 0.2,
+    vy: (Math.random() - 0.5) * 0.15,
+    ph: Math.random() * Math.PI * 2,
+    blink: 0.04 + Math.random() * 0.06
+  }));
+  // 藤蔓（带荆棘和玫瑰）
+  vines = [0.1, 0.2, 0.3, 0.42, 0.54, 0.66, 0.78, 0.9].map((rx) => ({
+    x: sceneCanvas.width * rx,
+    sway: Math.random() * Math.PI * 2,
+    len: sceneCanvas.height * (0.4 + Math.random() * 0.45),
+    thorns: Array.from({ length: 8 }, () => ({ t: Math.random() })),
+    roses: Array.from({ length: 3 }, () => ({ t: 0.15 + Math.random() * 0.7 })),
+    leaves: Array.from({ length: 12 }, () => ({ t: 0.05 + Math.random() * 0.9, side: Math.random() < 0.5 ? -1 : 1, size: 5 + Math.random() * 5, rot: (Math.random() - 0.5) * Math.PI })),
+    kick: 0
+  }));
+}
+
+function setScene(name) {
+  document.body.dataset.scene = name;
+  if (name === currentScene && !transitioning) return;
+  pendingScene = name;
+  transitioning = true;
+  transT = 0;
+}
+function lcdOff() { document.querySelector('.lcd-screen')?.classList.add('off'); }
+function lcdOn()  { document.querySelector('.lcd-screen')?.classList.remove('off'); }
+
+// —— 银河系悬臂（缓慢自转的螺旋星云）——
+function drawGalaxy() {
+  // 银河系放在唱片机下方，避免被唱片机遮挡
+  const tb = document.querySelector('.turntable-body');
+  const rect = tb ? tb.getBoundingClientRect() : null;
+  const maxR = rect ? Math.hypot(rect.width, rect.height) * 0.55 : Math.min(sceneCanvas.width, sceneCanvas.height) * 0.5;
+  const cx = rect ? rect.left + rect.width / 2 : sceneCanvas.width * 0.5;
+  const cy = rect ? rect.bottom + maxR * 0.28 : sceneCanvas.height * 0.5;
+  galaxyAngle += 0.0006;  // 极缓慢自转
+  // 中心亮核光晕
+  const core = sceneCtx.createRadialGradient(cx, cy, 0, cx, cy, maxR * 0.35);
+  core.addColorStop(0, 'rgba(230,215,255,0.22)');
+  core.addColorStop(0.5, 'rgba(170,140,230,0.09)');
+  core.addColorStop(1, 'rgba(90,70,150,0)');
+  sceneCtx.fillStyle = core;
+  sceneCtx.beginPath();
+  sceneCtx.arc(cx, cy, maxR * 0.5, 0, Math.PI * 2);
+  sceneCtx.fill();
+  // 悬臂上的星点
+  for (const gs of galaxyStars) {
+    const ang = gs.a + galaxyAngle;
+    const rr = gs.r * maxR;
+    const x = cx + Math.cos(ang) * rr;
+    const y = cy + Math.sin(ang) * rr * 0.62;  // 压扁，侧视银河系
+    const op = gs.o * (0.5 + 0.5 * gs.r);      // 外侧更亮
+    sceneCtx.fillStyle = `hsla(${gs.hue},75%,80%,${op})`;
+    sceneCtx.beginPath();
+    sceneCtx.arc(x, y, gs.size, 0, Math.PI * 2);
+    sceneCtx.fill();
+  }
+}
+
+// —— 漂浮的太空陨石 ——
+function drawAsteroids() {
+  for (const a of asteroids) {
+    // 鼠标排斥
+    if (sceneMouse.active) {
+      const dx = a.x - sceneMouse.x, dy = a.y - sceneMouse.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < 120 * 120 && d2 > 1) {
+        const f = (1 - Math.sqrt(d2) / 120) * 0.6;
+        a.vx += (dx / Math.sqrt(d2)) * f;
+        a.vy += (dy / Math.sqrt(d2)) * f;
+      }
+    }
+    a.x += a.vx; a.y += a.vy; a.rot += a.rotSpeed;
+    a.vx *= 0.985; a.vy *= 0.985; // 阻尼回稳
+    if (a.x < -30) a.x = sceneCanvas.width + 30;
+    if (a.x > sceneCanvas.width + 30) a.x = -30;
+    if (a.y < -30) a.y = sceneCanvas.height + 30;
+    if (a.y > sceneCanvas.height + 30) a.y = -30;
+    sceneCtx.save();
+    sceneCtx.translate(a.x, a.y);
+    sceneCtx.rotate(a.rot);
+    // 不规则多边形主体
+    sceneCtx.beginPath();
+    for (let i = 0; i < a.verts.length; i++) {
+      const ang = (i / a.verts.length) * Math.PI * 2;
+      const rad = a.size * a.verts[i];
+      const px = Math.cos(ang) * rad, py = Math.sin(ang) * rad;
+      i === 0 ? sceneCtx.moveTo(px, py) : sceneCtx.lineTo(px, py);
+    }
+    sceneCtx.closePath();
+    const grad = sceneCtx.createRadialGradient(-a.size * 0.3, -a.size * 0.3, 0, 0, 0, a.size);
+    grad.addColorStop(0, '#6b5d52');
+    grad.addColorStop(1, '#2a221d');
+    sceneCtx.fillStyle = grad;
+    sceneCtx.fill();
+    sceneCtx.strokeStyle = 'rgba(20,15,12,0.8)';
+    sceneCtx.lineWidth = 0.8;
+    sceneCtx.stroke();
+    // 表面陨石坑
+    sceneCtx.fillStyle = 'rgba(0,0,0,0.25)';
+    sceneCtx.beginPath();
+    sceneCtx.arc(a.size * 0.2, -a.size * 0.1, a.size * 0.18, 0, Math.PI * 2);
+    sceneCtx.fill();
+    sceneCtx.restore();
+  }
+}
+
+// —— 星空场景 ——
+function drawStarry() {
+  drawGalaxy();        // 银河系悬臂（底层）
+  for (const s of stars) {
+    s.o += s.s;
+    const op = Math.abs(Math.sin(s.o)) * 0.7 + 0.25;
+    sceneCtx.fillStyle = s.hue === 0 ? `rgba(255,255,255,${op})` : `hsla(${s.hue},80%,75%,${op})`;
+    sceneCtx.beginPath();
+    sceneCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    sceneCtx.fill();
+  }
+  drawAsteroids();     // 漂浮陨石
+  if (Math.random() < 0.012 && shootingStars.length < 5) {
+    shootingStars.push({
+      x: Math.random() * sceneCanvas.width,
+      y: Math.random() * sceneCanvas.height,
+      vx: 6 + Math.random() * 4,
+      vy: 2 + Math.random() * 2,
+      life: 1.0
+    });
+  }
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    const sh = shootingStars[i];
+    sh.x += sh.vx; sh.y += sh.vy; sh.life -= 0.015;
+    // 联动：流星撞击陨石，陨石被撞飞
+    for (const a of asteroids) {
+      const dx = sh.x - a.x, dy = sh.y - a.y;
+      if (dx * dx + dy * dy < a.size * a.size) {
+        a.vx += sh.vx * 0.5; a.vy += sh.vy * 0.5;
+        sh.life = 0;
+        for (let k = 0; k < 8; k++) {
+          const ang = Math.random() * Math.PI * 2;
+          sceneParticles.push({ x: sh.x, y: sh.y, vx: Math.cos(ang) * 2, vy: Math.sin(ang) * 2, life: 0.8, color: 'star', size: 1.5 });
+        }
+        break;
+      }
+    }
+    if (sh.life <= 0) { shootingStars.splice(i, 1); continue; }
+    const grad = sceneCtx.createLinearGradient(sh.x, sh.y, sh.x - sh.vx * 8, sh.y - sh.vy * 8);
+    grad.addColorStop(0, `rgba(255,255,255,${sh.life})`);
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    sceneCtx.strokeStyle = grad;
+    sceneCtx.lineWidth = 1.5;
+    sceneCtx.beginPath();
+    sceneCtx.moveTo(sh.x, sh.y);
+    sceneCtx.lineTo(sh.x - sh.vx * 8, sh.y - sh.vy * 8);
+    sceneCtx.stroke();
+  }
+}
+
+// —— 落叶深林场景 ——
+function drawForest() {
+  const t = performance.now() * 0.001;
+  // 雾气渐变背景
+  const fog = sceneCtx.createLinearGradient(0, 0, 0, sceneCanvas.height);
+  fog.addColorStop(0, '#0a1a0e');
+  fog.addColorStop(0.6, '#162a18');
+  fog.addColorStop(1, '#1f3a24');
+  sceneCtx.fillStyle = fog;
+  sceneCtx.fillRect(0, 0, sceneCanvas.width, sceneCanvas.height);
+  // 垂落藤蔓（带荆棘 + 玫瑰）
+  for (const v of vines) {
+    v.sway += 0.008 + v.kick * 0.02;
+    v.kick *= 0.92;
+    const amp = 14 + v.kick;
+    const segs = 18;
+    const pts = [];
+    for (let s = 0; s <= segs; s++) {
+      const py = (s / segs) * v.len;
+      const px = v.x + Math.sin(s * 0.5 + v.sway) * amp;
+      pts.push({ x: px, y: py });
+    }
+    // 主茎
+    sceneCtx.strokeStyle = '#2a4a1a';
+    sceneCtx.lineWidth = 3;
+    sceneCtx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      if (i === 0) sceneCtx.moveTo(pts[i].x, pts[i].y);
+      else sceneCtx.lineTo(pts[i].x, pts[i].y);
+    }
+    sceneCtx.stroke();
+    // 荆棘（小尖刺）
+    sceneCtx.fillStyle = '#3a2a1a';
+    for (const th of v.thorns) {
+      const p = pts[Math.floor(th.t * segs)] || pts[0];
+      const dir = th.t < 0.5 ? -1 : 1;
+      sceneCtx.beginPath();
+      sceneCtx.moveTo(p.x, p.y);
+      sceneCtx.lineTo(p.x + dir * 6, p.y - 4);
+      sceneCtx.lineTo(p.x + dir * 4, p.y + 2);
+      sceneCtx.closePath();
+      sceneCtx.fill();
+    }
+    // 玫瑰（红花）
+    for (const r of v.roses) {
+      const p = pts[Math.floor(r.t * segs)] || pts[0];
+      sceneCtx.fillStyle = '#c0392b';
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        sceneCtx.beginPath();
+        sceneCtx.arc(p.x + Math.cos(a) * 3, p.y + Math.sin(a) * 3, 3, 0, Math.PI * 2);
+        sceneCtx.fill();
+      }
+      sceneCtx.fillStyle = '#7d1f15';
+      sceneCtx.beginPath(); sceneCtx.arc(p.x, p.y, 2, 0, Math.PI * 2); sceneCtx.fill();
+    }
+    // 叶子（椭圆叶，两侧分布，带叶脉）
+    for (const lf of v.leaves) {
+      const p = pts[Math.floor(lf.t * segs)] || pts[0];
+      sceneCtx.save();
+      sceneCtx.translate(p.x + lf.side * 3, p.y);
+      sceneCtx.rotate(lf.rot + (lf.side > 0 ? 0.4 : -0.4));
+      sceneCtx.fillStyle = '#3a6b1a';
+      sceneCtx.beginPath();
+      sceneCtx.ellipse(0, 0, lf.size, lf.size * 0.5, 0, 0, Math.PI * 2);
+      sceneCtx.fill();
+      sceneCtx.strokeStyle = '#2a4a12';
+      sceneCtx.lineWidth = 0.6;
+      sceneCtx.beginPath();
+      sceneCtx.moveTo(-lf.size, 0); sceneCtx.lineTo(lf.size, 0);
+      sceneCtx.stroke();
+      sceneCtx.restore();
+    }
+  }
+  // 远景树影
+  sceneCtx.fillStyle = 'rgba(8, 30, 8, 0.5)';
+  for (let i = 0; i < 8; i++) {
+    const x = (i / 8) * sceneCanvas.width;
+    sceneCtx.beginPath();
+    sceneCtx.ellipse(x, sceneCanvas.height, 80, 200, 0, 0, Math.PI * 2);
+    sceneCtx.fill();
+  }
+  // 近景树影（更深更小）
+  sceneCtx.fillStyle = 'rgba(4, 18, 6, 0.72)';
+  for (let i = 0; i < 6; i++) {
+    const x = (i / 6) * sceneCanvas.width + 40;
+    sceneCtx.beginPath();
+    sceneCtx.ellipse(x, sceneCanvas.height, 55, 150, 0, 0, Math.PI * 2);
+    sceneCtx.fill();
+  }
+  // 落叶
+  for (const leaf of leaves) {
+    leaf.sway += leaf.swaySpeed;
+    leaf.angle += leaf.rotSpeed;
+    leaf.y += leaf.vy;
+    leaf.x += leaf.vx + Math.sin(leaf.sway) * 0.6;
+    if (leaf.y > sceneCanvas.height + 20) { leaf.y = -20; leaf.x = Math.random() * sceneCanvas.width; }
+    if (leaf.x > sceneCanvas.width) leaf.x = 0;
+    if (leaf.x < 0) leaf.x = sceneCanvas.width;
+    sceneCtx.save();
+    sceneCtx.translate(leaf.x, leaf.y);
+    sceneCtx.rotate(leaf.angle);
+    sceneCtx.fillStyle = `hsl(${leaf.hue}, 65%, 50%)`;
+    sceneCtx.beginPath();
+    sceneCtx.ellipse(0, 0, leaf.size, leaf.size * 0.5, 0, 0, Math.PI * 2);
+    sceneCtx.fill();
+    sceneCtx.strokeStyle = `hsl(${leaf.hue}, 55%, 35%)`;
+    sceneCtx.lineWidth = 0.8;
+    sceneCtx.beginPath();
+    sceneCtx.moveTo(-leaf.size, 0);
+    sceneCtx.lineTo(leaf.size, 0);
+    sceneCtx.stroke();
+    sceneCtx.restore();
+  }
+  // 地面草地 + 草丛
+  sceneCtx.fillStyle = '#0d1f0d';
+  sceneCtx.fillRect(0, sceneCanvas.height * 0.9, sceneCanvas.width, sceneCanvas.height * 0.1);
+  sceneCtx.fillStyle = 'rgba(30, 65, 28, 0.6)';
+  for (let i = 0; i < 60; i++) {
+    const x = (i / 60) * sceneCanvas.width;
+    const y = sceneCanvas.height * 0.91 + Math.sin(i * 3) * 3;
+    sceneCtx.fillRect(x, y, 1, 6 + Math.sin(i * 7) * 3);
+  }
+  // 萤火虫（漂浮 + 闪烁）
+  for (const f of fireflies) {
+    // 鼠标吸引（被鼠标吸引聚集）
+    if (sceneMouse.active) {
+      const dx = sceneMouse.x - f.x, dy = sceneMouse.y - f.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 180 && d > 1) {
+        f.vx += (dx / d) * 0.08;
+        f.vy += (dy / d) * 0.08;
+      }
+    }
+    f.vx *= 0.94; f.vy *= 0.94;
+    f.x += f.vx + Math.sin(t + f.ph) * 0.15;
+    f.y += f.vy + Math.cos(t * 0.7 + f.ph) * 0.1;
+    f.ph += f.blink;
+    if (f.x < 0) f.x = sceneCanvas.width;
+    if (f.x > sceneCanvas.width) f.x = 0;
+    if (f.y < sceneCanvas.height * 0.15) f.y = sceneCanvas.height * 0.6;
+    if (f.y > sceneCanvas.height * 0.9) f.y = sceneCanvas.height * 0.3;
+    const glow = Math.sin(f.ph);
+    if (glow > 0) {
+      sceneCtx.fillStyle = `rgba(255,240,150,${glow * 0.85})`;
+      sceneCtx.beginPath(); sceneCtx.arc(f.x, f.y, 1.5, 0, Math.PI * 2); sceneCtx.fill();
+      sceneCtx.fillStyle = `rgba(255,240,150,${glow * 0.22})`;
+      sceneCtx.beginPath(); sceneCtx.arc(f.x, f.y, 4, 0, Math.PI * 2); sceneCtx.fill();
+    }
+  }
+}
+
+// —— 海浪沙滩场景 ——
+function drawOcean() {
+  const t = performance.now() * 0.001;
+  const horizon = sceneCanvas.height * 0.62;
+  // 黄昏天空渐变
+  const sky = sceneCtx.createLinearGradient(0, 0, 0, horizon);
+  sky.addColorStop(0, '#1e3a5f');
+  sky.addColorStop(0.55, '#ff8c5a');
+  sky.addColorStop(1, '#ffd9a0');
+  sceneCtx.fillStyle = sky;
+  sceneCtx.fillRect(0, 0, sceneCanvas.width, horizon);
+  // 太阳位置：放在唱片机右侧、地平线上方，动态避开唱片机
+  const tRect2 = document.querySelector('.turntable-body')?.getBoundingClientRect();
+  const sunX = tRect2 ? Math.min(tRect2.right + 60, sceneCanvas.width - 40) : sceneCanvas.width * 0.82;
+  const sunY = horizon - 70;
+  // 上升气泡
+  for (const b of bubbles) {
+    b.drift += 0.02; b.y += b.vy; b.x += Math.sin(b.drift) * 0.3;
+    if (b.y < -10) { b.y = sceneCanvas.height + 10; b.x = Math.random() * sceneCanvas.width; }
+    sceneCtx.fillStyle = `rgba(255,255,255,${b.o * 0.4})`;
+    sceneCtx.beginPath(); sceneCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2); sceneCtx.fill();
+    sceneCtx.strokeStyle = `rgba(255,255,255,${b.o * 0.7})`;
+    sceneCtx.lineWidth = 0.5; sceneCtx.stroke();
+  }
+  // 沙滩
+  sceneCtx.fillStyle = '#e8c878';
+  sceneCtx.fillRect(0, sceneCanvas.height * 0.82, sceneCanvas.width, sceneCanvas.height * 0.18);
+  // 沙滩纹理
+  sceneCtx.fillStyle = 'rgba(180, 140, 80, 0.3)';
+  for (let i = 0; i < 50; i++) {
+    const x = (i / 50) * sceneCanvas.width + Math.sin(i * 7) * 8;
+    const y = sceneCanvas.height * 0.88 + Math.sin(i * 13) * 4;
+    sceneCtx.beginPath(); sceneCtx.arc(x, y, 1.5, 0, Math.PI * 2); sceneCtx.fill();
+  }
+  // 透视海浪（从地平线冲向屏幕，越近越大越快越深 + 前景大浪花飞溅）
+  const sandTop = sceneCanvas.height * 0.82;
+  const span = sandTop - horizon;
+  const wlayers = [
+    { p: 0.06, amp: 0.04, freq: 0.050, speed: 0.5, color: 'rgba(90,140,180,0.55)' },
+    { p: 0.22, amp: 0.08, freq: 0.038, speed: 0.7, color: 'rgba(65,115,155,0.70)' },
+    { p: 0.42, amp: 0.14, freq: 0.028, speed: 1.0, color: 'rgba(45,95,135,0.82)' },
+    { p: 0.65, amp: 0.22, freq: 0.020, speed: 1.4, color: 'rgba(28,75,115,0.90)' },
+    { p: 0.90, amp: 0.32, freq: 0.015, speed: 1.9, color: 'rgba(15,55,90,0.96)' }
+  ];
+  for (let li = 0; li < wlayers.length; li++) {
+    const L = wlayers[li];
+    const baseY = horizon + span * L.p;
+    const amp = span * L.amp;
+    const pts = [];
+    for (let x = 0; x <= sceneCanvas.width; x += 5) {
+      const y = baseY
+        + Math.sin(x * L.freq + t * L.speed) * amp
+        + Math.sin(x * L.freq * 2.1 + t * L.speed * 1.6) * amp * 0.35;
+      pts.push({ x, y });
+    }
+    sceneCtx.fillStyle = L.color;
+    sceneCtx.beginPath(); sceneCtx.moveTo(0, pts[0].y);
+    for (const p2 of pts) sceneCtx.lineTo(p2.x, p2.y);
+    sceneCtx.lineTo(sceneCanvas.width, sceneCanvas.height);
+    sceneCtx.lineTo(0, sceneCanvas.height);
+    sceneCtx.closePath(); sceneCtx.fill();
+    // 中近层浪尖泡沫线
+    if (li >= 2) {
+      sceneCtx.strokeStyle = `rgba(255,255,255,${0.3 + li * 0.12})`;
+      sceneCtx.lineWidth = 1 + li * 0.5;
+      sceneCtx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        if (i === 0) sceneCtx.moveTo(pts[i].x, pts[i].y);
+        else sceneCtx.lineTo(pts[i].x, pts[i].y);
+      }
+      sceneCtx.stroke();
+    }
+    // 前景大浪花冲出屏幕（最近层）
+    if (li === wlayers.length - 1) {
+      for (let i = 3; i < pts.length - 3; i++) {
+        if (pts[i].y < pts[i - 2].y && pts[i].y < pts[i + 2].y && Math.random() < 0.12) {
+          sceneCtx.fillStyle = 'rgba(255,255,255,0.85)';
+          sceneCtx.beginPath();
+          sceneCtx.arc(pts[i].x, pts[i].y - 4, 2 + Math.random() * 2, 0, Math.PI * 2);
+          sceneCtx.fill();
+          for (let s = 0; s < 3; s++) {
+            sceneCtx.fillStyle = `rgba(255,255,255,${0.5 - s * 0.15})`;
+            sceneCtx.beginPath();
+            sceneCtx.arc(pts[i].x + (Math.random() - 0.5) * 10, pts[i].y - 8 - s * 5, 1, 0, Math.PI * 2);
+            sceneCtx.fill();
+          }
+        }
+      }
+    }
+  }
+  // 落日 + 光晕（海浪之后绘制，叠在海面上）
+  const halo = sceneCtx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 90);
+  halo.addColorStop(0, 'rgba(255,220,150,0.9)');
+  halo.addColorStop(0.4, 'rgba(255,140,80,0.45)');
+  halo.addColorStop(1, 'rgba(255,100,60,0)');
+  sceneCtx.fillStyle = halo;
+  sceneCtx.beginPath(); sceneCtx.arc(sunX, sunY, 90, 0, Math.PI * 2); sceneCtx.fill();
+  sceneCtx.fillStyle = 'rgba(255,238,190,0.96)';
+  sceneCtx.beginPath(); sceneCtx.arc(sunX, sunY, 26, 0, Math.PI * 2); sceneCtx.fill();
+  // 海面波光闪烁
+  for (const sp of sparkles) {
+    const blink = Math.sin(t * 3 + sp.ph);
+    if (blink > 0.6) {
+      sceneCtx.fillStyle = `rgba(255,255,255,${(blink - 0.6) * 1.8})`;
+      sceneCtx.fillRect(sp.x, sp.y, sp.w, 1);
+    }
+  }
+  // 海鸥
+  for (const g of seagulls) {
+    // 鼠标影响：海鸥上下浮动随鼠标 Y（接近时飞高）
+    if (sceneMouse.active) {
+      const dx = sceneMouse.x - g.x;
+      if (Math.abs(dx) < 200) g.targetY = sceneCanvas.height * 0.15 + (1 - Math.abs(dx) / 200) * (-30);
+      else g.targetY = g.baseY;
+    }
+    if (g.targetY === undefined) g.targetY = g.baseY;
+    g.y += (g.targetY - g.y) * 0.04;
+    // 联动：水花粒子碰到海鸥，海鸥飞高
+    for (const p of sceneParticles) {
+      if (p.color !== 'water') continue;
+      const pdx = p.x - g.x, pdy = p.y - g.y;
+      if (pdx * pdx + pdy * pdy < 400) { g.targetY = sceneCanvas.height * 0.1; break; }
+    }
+    g.x += g.vx; g.flap += 0.18;
+    if (g.x > sceneCanvas.width + 40) g.x = -40;
+    const yy = g.y + Math.sin(t * g.bob) * 7;
+    const wing = Math.cos(g.flap) * 9;
+    sceneCtx.strokeStyle = 'rgba(35,35,45,0.75)';
+    sceneCtx.lineWidth = 1.6;
+    sceneCtx.beginPath();
+    sceneCtx.moveTo(g.x - 11, yy + Math.abs(wing) * 0.3);
+    sceneCtx.lineTo(g.x, yy - Math.abs(wing) * 0.5);
+    sceneCtx.lineTo(g.x + 11, yy + Math.abs(wing) * 0.3);
+    sceneCtx.stroke();
+  }
+}
+
+function drawCurrentScene() {
+  if (currentScene === 'starry') drawStarry();
+  else if (currentScene === 'forest') drawForest();
+  else if (currentScene === 'ocean') drawOcean();
+  else { sceneCtx.fillStyle = '#000'; sceneCtx.fillRect(0, 0, sceneCanvas.width, sceneCanvas.height); }
+  drawSceneParticles(); // 交互粒子层（最上层）
+}
+// —— 鼠标交互事件 ——
+sceneCanvas.addEventListener('mousemove', (e) => {
+  sceneMouse.x = e.clientX; sceneMouse.y = e.clientY; sceneMouse.active = true;
+});
+sceneCanvas.addEventListener('mouseleave', () => { sceneMouse.active = false; sceneMouse.x = -9999; sceneMouse.y = -9999; });
+sceneCanvas.addEventListener('click', (e) => {
+  sceneMouse.clickX = e.clientX; sceneMouse.clickY = e.clientY;
+  sceneMouse.clickTime = performance.now(); sceneMouse.clickScene = currentScene;
+  handleSceneClick(e.clientX, e.clientY, currentScene);
+});
+function handleSceneClick(x, y, scene) {
+  if (scene === 'starry') {
+    // 点击：流星爆发粒子 + 生成一颗流星
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * Math.PI * 2;
+      sceneParticles.push({ x, y, vx: Math.cos(a) * (2 + Math.random() * 3), vy: Math.sin(a) * (2 + Math.random() * 3), life: 1, color: 'star', size: 2 + Math.random() * 2 });
+    }
+    shootingStars.push({ x, y, vx: 4 + Math.random() * 3, vy: 1.5 + Math.random() * 2, life: 1.0 });
+  } else if (scene === 'forest') {
+    // 点击藤蔓：让最近的藤蔓剧烈摇摆
+    let hitVine = null, minDist = 40;
+    for (const v of vines) {
+      if (y > v.len + 20) continue;
+      const d = Math.abs(x - v.x);
+      if (d < minDist) { minDist = d; hitVine = v; }
+    }
+    if (hitVine) {
+      hitVine.kick = 35;
+      hitVine.sway += (x < hitVine.x ? -1 : 1) * 0.5;
+    }
+    // 点击：花瓣/叶子粒子 + 掉落叶子
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      sceneParticles.push({ x, y, vx: Math.cos(a) * (1 + Math.random() * 2), vy: Math.sin(a) * (1 + Math.random() * 2) - 1, life: 1, color: 'petal', size: 3 + Math.random() * 3, rot: Math.random() * Math.PI });
+    }
+    leaves.push({ x, y: y, vx: (Math.random() - 0.5) * 1.5, vy: 0.5 + Math.random(), rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.06, size: 8 + Math.random() * 6, hue: 20 + Math.random() * 40 });
+  } else if (scene === 'ocean') {
+    // 点击太阳：释放一次光芒（径向爆发 + 扩散光环）
+    const tRect2 = document.querySelector('.turntable-body')?.getBoundingClientRect();
+    const sunX = tRect2 ? Math.min(tRect2.right + 60, sceneCanvas.width - 40) : sceneCanvas.width * 0.82;
+    const sunY = sceneCanvas.height * 0.62 - 70;
+    const sdx = x - sunX, sdy = y - sunY;
+    if (sdx * sdx + sdy * sdy < 55 * 55) {
+      for (let i = 0; i < 36; i++) {
+        const a = (i / 36) * Math.PI * 2;
+        sceneParticles.push({ x: sunX, y: sunY, vx: Math.cos(a) * (4 + Math.random() * 2), vy: Math.sin(a) * (4 + Math.random() * 2), life: 1.2, color: 'sunray', size: 3 + Math.random() * 2 });
+      }
+      ripples.push({ x: sunX, y: sunY, r: 0, life: 1.3, isSun: true });
+      return;
+    }
+    // 点击海面：水花飞溅 + 涟漪扩散
+    ripples.push({ x, y, r: 0, life: 1 });
+    for (let i = 0; i < 16; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+      sceneParticles.push({ x, y, vx: Math.cos(a) * (1.5 + Math.random() * 3), vy: Math.sin(a) * (2 + Math.random() * 3), life: 1, color: 'water', size: 2 + Math.random() * 2 });
+    }
+  }
+}
+function drawSceneParticles() {
+  for (let i = sceneParticles.length - 1; i >= 0; i--) {
+    const p = sceneParticles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.97; p.vy *= 0.97;
+    if (p.color === 'water') p.vy += 0.15;       // 水花受重力
+    else if (p.color === 'petal') p.vy += 0.05;   // 花瓣轻飘
+    p.life -= 0.018;
+    if (p.rot !== undefined) p.rot += 0.08;
+    if (p.life <= 0) { sceneParticles.splice(i, 1); continue; }
+    const al = Math.max(0, p.life);
+    if (p.color === 'star') {
+      sceneCtx.fillStyle = `rgba(255,255,220,${al})`;
+      sceneCtx.beginPath(); sceneCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2); sceneCtx.fill();
+      sceneCtx.fillStyle = `rgba(180,200,255,${al * 0.3})`;
+      sceneCtx.beginPath(); sceneCtx.arc(p.x, p.y, p.size * 2.5, 0, Math.PI * 2); sceneCtx.fill();
+    } else if (p.color === 'petal') {
+      sceneCtx.save(); sceneCtx.translate(p.x, p.y); sceneCtx.rotate(p.rot);
+      sceneCtx.fillStyle = `hsla(${30 + (p.hue || 0)},80%,65%,${al})`;
+      sceneCtx.beginPath(); sceneCtx.ellipse(0, 0, p.size, p.size * 0.5, 0, 0, Math.PI * 2); sceneCtx.fill();
+      sceneCtx.restore();
+    } else if (p.color === 'water') {
+      sceneCtx.fillStyle = `rgba(200,230,255,${al})`;
+      sceneCtx.beginPath(); sceneCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2); sceneCtx.fill();
+    } else if (p.color === 'sunray') {
+      sceneCtx.fillStyle = `rgba(255,220,120,${al})`;
+      sceneCtx.beginPath(); sceneCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2); sceneCtx.fill();
+      sceneCtx.fillStyle = `rgba(255,180,60,${al * 0.3})`;
+      sceneCtx.beginPath(); sceneCtx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2); sceneCtx.fill();
+    }
+  }
+  // 海面涟漪
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    r.r += r.isSun ? 4 : 2.5; r.life -= r.isSun ? 0.012 : 0.015;
+    if (r.life <= 0) { ripples.splice(i, 1); continue; }
+    if (r.isSun) {
+      // 太阳光环：正圆 + 金色 + 多层光晕
+      sceneCtx.strokeStyle = `rgba(255,200,80,${r.life * 0.6})`;
+      sceneCtx.lineWidth = 2.5;
+      sceneCtx.beginPath(); sceneCtx.arc(r.x, r.y, r.r, 0, Math.PI * 2); sceneCtx.stroke();
+      sceneCtx.strokeStyle = `rgba(255,160,40,${r.life * 0.3})`;
+      sceneCtx.lineWidth = 6;
+      sceneCtx.beginPath(); sceneCtx.arc(r.x, r.y, r.r, 0, Math.PI * 2); sceneCtx.stroke();
+    } else {
+      sceneCtx.strokeStyle = `rgba(255,255,255,${r.life * 0.5})`;
+      sceneCtx.lineWidth = 1.5;
+      sceneCtx.beginPath(); sceneCtx.ellipse(r.x, r.y, r.r, r.r * 0.35, 0, 0, Math.PI * 2); sceneCtx.stroke();
+    }
+  }
+}
+function drawScene(ts) {
+  ts = ts || performance.now();
+  if (!lastTime) lastTime = ts;
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+  sceneCtx.clearRect(0, 0, sceneCanvas.width, sceneCanvas.height);
+  if (transitioning) {
+    transT += dt;
+    const half = 0.35; // 半程，总过渡 0.7s
+    if (transT >= half && currentScene !== pendingScene) currentScene = pendingScene;
+    drawCurrentScene();
+    let alpha = transT < half ? transT / half : 1 - (transT - half) / half;
+    sceneCtx.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, alpha))})`;
+    sceneCtx.fillRect(0, 0, sceneCanvas.width, sceneCanvas.height);
+    if (transT >= half * 2) { transitioning = false; currentScene = pendingScene; }
+  } else {
+    drawCurrentScene();
+  }
+  requestAnimationFrame(drawScene);
+}
+
+resizeCanvas();
+lcdOff();
+drawScene();
+window.addEventListener('resize', resizeCanvas);
+
+// ===================== Tab 切换（黑胶唱片版）=====================
+function switchTab(name) {
+  // 切换/归位前清理上一个 tab 的摄像头与语音识别，避免资源残留
+  stopCameraStream();
+  stopVoiceRecognition();
+  // 如果点击的是正在旋转的光盘，归位（唱臂抬起 + 收起卡片）
+  const currentActive = document.querySelector('.vinyl.active');
+  if (currentActive && currentActive.dataset.tab === name) {
+    currentActive.classList.remove('active');
+    const panels = document.querySelector('.panels');
+    if (panels) panels.classList.remove('open');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    setScene('off');           // 背景纯黑
+    lcdOff();                   // LCD 熄灭
+    return;
+  }
+  document.querySelectorAll('.vinyl').forEach(v => {
+    v.classList.toggle('active', v.dataset.tab === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  // 切 tab 时自动收起卡片
+  const panels = document.querySelector('.panels');
+  if (panels) panels.classList.remove('open');
+  document.getElementById('panel-' + name).classList.add('active');
+  // 切换背景场景
+  if (name === 'register') setScene('starry');
+  else if (name === 'recognize') setScene('forest');
+  else if (name === 'database') setScene('ocean');
+  lcdOn();                      // LCD 点亮
+  // LED 灯颜色跟随 tab
+  const ledColor = name === 'register' ? '#e74c3c'
+                 : name === 'recognize' ? '#27ae60'
+                 : '#3498db';
+  document.documentElement.style.setProperty('--led-color', ledColor);
+  if (name === 'database') loadDatabase();
+  // 同步更新 LCD 屏
+  updateLCD(name);
+}
+
+// ===================== LCD 屏更新 =====================
+const LCD_DATA = {
+  register:  { side:'A', title:'录入新物体',  sub:'ResNet-18 · 512 维特征提取',     status:'ready'    },
+  recognize: { side:'B', title:'识别物体',    sub:'特征库检索 · 余弦相似度 ≥ 0.75', status:'scanning' },
+  database:  { side:'C', title:'特征库管理',  sub:'已存物体 · 持久化存储',          status:'browsing' }
+};
+function updateLCD(tab) {
+  const d = LCD_DATA[tab]; if (!d) return;
+  const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  set('lcd-l1', `▶ NOW PLAYING · ${d.side} 面`);
+  set('lcd-l2', d.title);
+  set('lcd-l3', d.sub);
+  set('lcd-l4', `[ ●REC ] status: ${d.status}<span class="lcd-blink">_</span>`);
+}
+
+// ===================== 旋钮功能 =====================
+// VOLUME 0-100 → 语音播报音量 0-1
+// BASS   0-100 → 唱片旋转速度 8s(慢) ~ 1s(快)
+// TREBLE 0-100 → LCD 屏亮度（text-shadow 模糊半径 + 内阴影强度）
+const KNOB = { volume: 50, bass: 50, treble: 60 };
+const KNOB_LABEL = { volume: 'VOLUME', bass: 'BASS', treble: 'TREBLE' };
+
+function applyKnob(name) {
+  const v = KNOB[name];
+  const root = document.documentElement;
+  if (name === 'volume') {
+    // 影响后续语音播报音量（speak 函数读取）
+  } else if (name === 'bass') {
+    // 0-100 → 8s ~ 1s（值越大转得越快）
+    const dur = (8 - (v / 100) * 7).toFixed(2);
+    root.style.setProperty('--vinyl-spin-dur', dur + 's');
+  } else if (name === 'treble') {
+    // 0-100 → 2px ~ 14px text-shadow
+    const glow = (2 + (v / 100) * 12).toFixed(1);
+    const inset = (8 + (v / 100) * 40).toFixed(0);
+    root.style.setProperty('--lcd-glow', glow + 'px');
+    root.style.setProperty('--lcd-inset', inset + 'px');
+  }
+  // 视觉：旋钮指针旋转 0-100 → 0-270°
+  const knob = document.querySelector(`.knob-wrap[data-knob="${name}"] .knob`);
+  if (knob) knob.style.transform = `rotate(${(v / 100) * 270 - 135}deg)`;
+  // LCD 状态显示
+  const l4 = document.getElementById('lcd-l4');
+  if (l4) {
+    const tab = document.querySelector('.vinyl.active')?.dataset.tab || 'register';
+    const d = LCD_DATA[tab];
+    l4.innerHTML = `[ ●REC ] status: ${d.status} · ${KNOB_LABEL[name]}=${v}<span class="lcd-blink">_</span>`;
+  }
+}
+
+function bindKnobs() {
+  document.querySelectorAll('.knob-wrap').forEach(wrap => {
+    const name = wrap.dataset.knob;
+    if (!name) return;
+    const knob = wrap.querySelector('.knob');
+    // 滚轮调整值
+    wrap.addEventListener('wheel', e => {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 5 : -5;
+      KNOB[name] = Math.max(0, Math.min(100, KNOB[name] + delta));
+      applyKnob(name);
+    }, { passive: false });
+    // 点击 = 弹出对应卡片
+    knob.addEventListener('click', e => {
+      e.stopPropagation();
+      openCard(name);
+    });
+    // 拖动旋转调值
+    let dragging = false, startY = 0, startV = 0;
+    knob.addEventListener('mousedown', e => {
+      // 只有用 Shift+拖动才调值，避免误触
+      if (!e.shiftKey) return;
+      dragging = true; startY = e.clientY; startV = KNOB[name];
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const dy = startY - e.clientY;
+      KNOB[name] = Math.max(0, Math.min(100, startV + dy));
+      applyKnob(name);
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
+  });
+}
+bindKnobs();
+applyKnob('volume'); applyKnob('bass'); applyKnob('treble');
+
+// ===================== 卡片弹出 / 收起 =====================
+// 旋钮位置 → 卡片模式映射（按 tab 动态）
+const KNOB_MODE_BY_TAB = {
+  register:  { volume: 'live',   bass: 'text'  },  // 录入：左=实时摄像头语音 右=文字
+  recognize: { volume: 'camera', bass: 'upload' }, // 识别：左=摄像头 右=上传
+  database:  { volume: 'add',   bass: 'del'    }   // 特征库：左=补充图片 右=删除
+};
+const MODE_LABEL = {
+  live:  '摄像头语音录入',
+  voice: '语音录入',
+  text:  '文字录入',
+  batch: '批量录入',
+  camera:'摄像头识别',
+  upload:'上传识别',
+  list:  '特征库列表',
+  add:   '补充图片',
+  del:   '删除物体',
+  clear: '清空库'
+};
+// 切换卡片模式时清空上一次的表单状态（结果框、预览图、文件选择）
+function resetCardMode(cardMode) {
+  if (!cardMode) return;
+  cardMode.querySelectorAll('.result-box').forEach(el => el.innerHTML = '');
+  cardMode.querySelectorAll('.drop-preview').forEach(el => { el.classList.remove('show'); el.removeAttribute('src'); });
+  cardMode.querySelectorAll('input[type=file]').forEach(el => { el.value = ''; });
+}
+function openCard(knobName) {
+  // 右侧 TREBLE 旋钮 = 收起卡片
+  if (knobName === 'treble') {
+    closeCard();
+    return;
+  }
+  const activeVinyl = document.querySelector('.vinyl.active');
+  // 唱片不在唱片机上时，旋钮无法摊开卡片
+  if (!activeVinyl) {
+    const l4 = document.getElementById('lcd-l4');
+    if (l4) l4.textContent = '⚠ 请先把唱片放上转盘';
+    return;
+  }
+  const tab = activeVinyl.dataset.tab;
+  const mode = (KNOB_MODE_BY_TAB[tab] || {})[knobName] || 'voice';
+  // 展开面板
+  const panels = document.querySelector('.panels');
+  if (panels) panels.classList.add('open');
+  // 切到对应 tab 的 panel
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const targetPanel = document.getElementById('panel-' + tab);
+  if (targetPanel) {
+    targetPanel.classList.add('active');
+  }
+  // 切换 panel 内的 card-mode
+  if (targetPanel) {
+    targetPanel.querySelectorAll('.card-mode').forEach(cm => cm.classList.remove('active'));
+    const targetMode = targetPanel.querySelector(`.card-mode[data-mode="${mode}"]`);
+      if (targetMode) {
+        targetMode.classList.add('active');
+        resetCardMode(targetMode);
+        if (tab === 'database') { loadDatabase(); if (mode === 'add') refreshObjectNames(); }
+      } else {
+      // 没有对应 mode，显示默认（第一个）
+      const first = targetPanel.querySelector('.card-mode');
+      if (first) first.classList.add('active');
+    }
+  }
+  // LCD 显示触发信息
+  const l4 = document.getElementById('lcd-l4');
+  if (l4) {
+    const d = LCD_DATA[tab];
+    const modeLabel = MODE_LABEL[mode] || mode;
+    l4.innerHTML = `[ ●REC ] status: ${d.status} · mode: ${modeLabel}<span class="lcd-blink">_</span>`;
+  }
+}
+function closeCard() {
+  const panels = document.querySelector('.panels');
+  if (panels) panels.classList.remove('open');
+  // 恢复 LCD 状态
+  const activeVinyl = document.querySelector('.vinyl.active');
+  const tab = activeVinyl?.dataset.tab || 'register';
+  updateLCD(tab);
+}
+
+// ===================== 文字/批量录入模式 =====================
+function registerObjectMode(mode) {
+  const nameEl = document.getElementById(`reg-name-${mode}`);
+  const filesEl = document.getElementById(`reg-files-${mode}`);
+  const resultBox = document.getElementById(`reg-result-${mode}`);
+  if (!nameEl || !filesEl || !resultBox) return;
+  const name = nameEl.value.trim();
+  if (!name) { showResult(resultBox, 'error', '请输入物体名称'); return; }
+  const files = filesEl.files;
+  if (!files || files.length === 0) { showResult(resultBox, 'error', '请至少上传一张图片'); return; }
+  const fd = new FormData();
+  fd.append('name', name);
+  for (const f of files) fd.append('images', f);
+  resultBox.innerHTML = '<div style="color:#a5b4fc;padding:0.5rem">⏳ 录入中...</div>';
+  fetch('/register', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(result => {
+      if (result.success) {
+        showResult(resultBox, 'success', result.message);
+        speak(result.message);
+        nameEl.value = ''; filesEl.value = '';
+        const fn = document.getElementById(`reg-filenames-${mode}`); if (fn) fn.innerHTML = '';
+        const pv = document.getElementById(`reg-previews-${mode}`); if (pv) pv.innerHTML = '';
+        loadDatabase();
+        refreshObjectNames();
+      } else {
+        showResult(resultBox, 'error', result.message);
+      }
+    })
+    .catch(e => showResult(resultBox, 'error', '请求失败: ' + e.message));
+}
+
+// ===================== 特征库管理 =====================
+function deleteObjectByName() {
+  const nameEl = document.getElementById('db-del-name');
+  const resultBox = document.getElementById('db-del-result');
+  if (!nameEl || !resultBox) return;
+  const name = nameEl.value.trim();
+  if (!name) { showResult(resultBox, 'error', '请输入物体名称'); return; }
+  resultBox.innerHTML = '<div style="color:#a5b4fc;padding:0.5rem">⏳ 删除中...</div>';
+  const fd = new FormData();
+  fd.append('name', name);
+  fetch('/delete', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(result => {
+      if (result.success) {
+        showResult(resultBox, 'success', result.message);
+        speak(result.message);
+        nameEl.value = '';
+        loadDatabase();
+      } else {
+        showResult(resultBox, 'error', result.message);
+      }
+    })
+    .catch(e => showResult(resultBox, 'error', '请求失败: ' + e.message));
+}
+function clearDatabase() {
+  const resultBox = document.getElementById('db-clear-result');
+  if (!resultBox) return;
+  if (!confirm('确定清空全部特征库？此操作不可恢复！')) return;
+  resultBox.innerHTML = '<div style="color:#a5b4fc;padding:0.5rem">⏳ 清空中...</div>';
+  fetch('/clear', { method: 'POST' })
+    .then(r => r.json())
+    .then(result => {
+      if (result.success) {
+        showResult(resultBox, 'success', result.message);
+        speak(result.message);
+        loadDatabase();
+      } else {
+        showResult(resultBox, 'error', result.message);
+      }
+    })
+    .catch(e => showResult(resultBox, 'error', '请求失败: ' + e.message));
+}
+
+
+
+// ===================== 文件上传预览 =====================
+function setupFileInput(inputId, previewId, filenameId, dropImgId) {
+  const input = document.getElementById(inputId);
+  input.addEventListener('change', e => {
+    showPreviews(e.target.files, previewId, filenameId, dropImgId);
+  });
+}
+function showPreviews(files, previewId, filenameId, dropImgId) {
+  const preview = document.getElementById(previewId);
+  const fnames = document.getElementById(filenameId);
+  const dropImg = dropImgId ? document.getElementById(dropImgId) : null;
+  if (dropImg) {
+    if (files.length) {
+      dropImg.src = URL.createObjectURL(files[0]);
+      dropImg.classList.add('show');
+      dropImg.onload = () => URL.revokeObjectURL(dropImg.src);
+    } else {
+      dropImg.classList.remove('show');
+    }
+  }
+  if (preview) preview.innerHTML = ''; // 框内已显示大图，清空下方缩略图避免重复
+  if (fnames) fnames.innerHTML = '';
+  if (files.length > 0 && fnames) {
+    fnames.textContent = files.length + ' 张图片已选择';
+  }
+}
+
+setupFileInput('reg-files', 'reg-previews', 'reg-filenames', 'reg-drop-img');
+setupFileInput('reg-files-text', 'reg-previews-text', 'reg-filenames-text', 'reg-drop-text-img');
+setupFileInput('reg-files-batch', 'reg-previews-batch', 'reg-filenames-batch', 'reg-drop-batch-img');
+
+// 拖拽支持
+['reg-drop', 'rec-drop', 'reg-drop-text', 'reg-drop-batch', 'add-drop'].forEach(id => {
+  const zone = document.getElementById(id);
+  ['dragover','dragenter'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('dragover'); }));
+  ['dragleave','dragend'].forEach(ev => zone.addEventListener(ev, () => zone.classList.remove('dragover')));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const input = zone.querySelector('input[type=file]');
+    input.files = e.dataTransfer.files;
+    input.dispatchEvent(new Event('change'));
+  });
+});
+
+// ===================== 录入物体 =====================
+async function registerObject() {
+  const name = document.getElementById('reg-name').value.trim();
+  const files = document.getElementById('reg-files').files;
+  const result = document.getElementById('reg-result');
+
+  if (!name) { showResult(result, 'error', '请输入物体名称'); return; }
+  if (!files.length) { showResult(result, 'error', '请至少上传一张图片'); return; }
+
+  const btn = document.getElementById('reg-submit');
+  btn.disabled = true;
+  btn.textContent = '正在提取特征...';
+
+  const formData = new FormData();
+  formData.append('name', name);
+  Array.from(files).forEach(f => formData.append('images', f));
+
+  try {
+    const resp = await fetch('/register', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (data.success) {
+      showResult(result, 'success', `<div class="result-head"><div class="badge-icon"><svg class="icon"><use href="#icon-check"/></svg></div><div class="result-title">录入成功</div></div><div class="result-text" style="font-size:1.2rem">${data.object_name}</div><div class="result-sub">${data.message}</div>`);
+      speak(data.message);
+      loadDatabase();
+      refreshObjectNames();
+    } else {
+      showResult(result, 'error', `<div class="result-head"><div class="badge-icon"><svg class="icon"><use href="#icon-alert"/></svg></div><div class="result-title">录入失败</div></div><div class="result-text" style="font-size:1rem;font-weight:600;background:none;-webkit-text-fill-color:#fca5a5">${data.message}</div>`);
+    }
+  } catch (e) {
+    showResult(result, 'error', `<div class="result-head"><div class="badge-icon"><svg class="icon"><use href="#icon-alert"/></svg></div><div class="result-title">请求失败</div></div><div class="result-text" style="font-size:1rem;font-weight:600;background:none;-webkit-text-fill-color:#fca5a5">${e.message}</div>`);
+  }
+  btn.disabled = false;
+  btn.innerHTML = '录入物体';
+}
+
+// ===================== 识别物体 =====================
+let videoStream = null, autoRecTimer = null, recognizing = false, lastRecKey = null, voiceAssistant = false, vaRecognition = null, forceSpeak = false, speaking = false, awaitingNameInput = false, nameInputTarget = null;
+
+// 关闭摄像头流并重置 UI（切换/归位时调用）
+function stopCameraStream() {
+  // 识别摄像头
+  if (videoStream) {
+    videoStream.getTracks().forEach(t => t.stop());
+    videoStream = null;
+    if (autoRecTimer) { clearInterval(autoRecTimer); autoRecTimer = null; }
+    const video = document.getElementById('rec-video');
+    const btn = document.getElementById('rec-cam-btn');
+    const captureBtn = document.getElementById('rec-capture-btn');
+    if (video) video.classList.remove('show');
+    if (captureBtn) captureBtn.style.display = 'none';
+    if (btn) btn.innerHTML = '<svg class="icon"><use href="#icon-camera"/></svg>开启摄像头';
+  }
+  // 录入摄像头
+  if (regVideoStream) {
+    regVideoStream.getTracks().forEach(t => t.stop());
+    regVideoStream = null;
+    const v = document.getElementById('reg-video-live');
+    const b = document.getElementById('reg-cam-live-btn');
+    const cb = document.getElementById('reg-capture-live-btn');
+    if (v) v.classList.remove('show');
+    if (cb) cb.style.display = 'none';
+    if (b) b.innerHTML = '<svg class="icon"><use href="#icon-camera"/></svg>开启摄像头';
+  }
+}
+// 停止语音识别（切换/归位时调用）
+function stopVoiceRecognition() {
+  if (vaRecognition) { try { vaRecognition.stop(); } catch (e) {} }
+}
+// ===================== 实时摄像头语音录入 =====================
+let regVideoStream = null;
+
+// 枚举摄像头设备并填充下拉框（需在获得摄像头权限后调用，否则 label 为空）
+async function populateCameraSelects() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videos = devices.filter(d => d.kind === 'videoinput');
+    ['rec-camera-select', 'reg-camera-select'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">默认摄像头</option>';
+      videos.forEach((v, i) => {
+        const opt = document.createElement('option');
+        opt.value = v.deviceId;
+        opt.textContent = v.label || ('摄像头 ' + (i + 1));
+        sel.appendChild(opt);
+      });
+      if (cur) sel.value = cur;
+    });
+  } catch (e) { console.error('enumerateDevices error:', e); }
+}
+
+// 诊断视频帧：判断摄像头是否传回有效画面（全黑/全灰=被遮挡或硬件问题）
+function diagnoseVideo(video) {
+  if (!video || !video.videoWidth) {
+    console.warn('[诊断] videoWidth=0，视频未就绪');
+    return;
+  }
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    // 采样像素（取间隔点，避免全量计算）
+    let rSum = 0, gSum = 0, bSum = 0, count = 0;
+    let allSame = true, firstR = data[0], firstG = data[1], firstB = data[2];
+    for (let i = 0; i < data.length; i += 16 * 4) {
+      const r = data[i], g = data[i+1], b = data[i+2];
+      rSum += r; gSum += g; bSum += b; count++;
+      if (Math.abs(r - firstR) > 10 || Math.abs(g - firstG) > 10 || Math.abs(b - firstB) > 10) allSame = false;
+    }
+    const rAvg = Math.round(rSum / count), gAvg = Math.round(gSum / count), bAvg = Math.round(bSum / count);
+    console.log('[诊断] 视频尺寸:', video.videoWidth, 'x', video.videoHeight);
+    console.log('[诊断] 平均色 RGB:', rAvg, gAvg, bAvg);
+    console.log('[诊断] 画面是否几乎全一色:', allSame);
+    if (allSame) {
+      console.warn('[诊断] 摄像头返回全一色画面 → 可能原因：镜头被遮挡、隐私盖未打开、摄像头硬件故障、或选错了虚拟摄像头');
+    }
+  } catch (e) {
+    console.error('[诊断] 帧分析失败:', e);
+  }
+}
+
+async function toggleRegCamera() {
+  const video = document.getElementById('reg-video-live');
+  const btn = document.getElementById('reg-cam-live-btn');
+  const captureBtn = document.getElementById('reg-capture-live-btn');
+  if (regVideoStream) {
+    regVideoStream.getTracks().forEach(t => t.stop());
+    regVideoStream = null;
+    video.classList.remove('show');
+    captureBtn.style.display = 'none';
+    btn.innerHTML = '<svg class="icon"><use href="#icon-camera"/></svg>开启摄像头';
+    return;
+  }
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('摄像头无法访问！\n\n原因：当前地址 ' + location.origin + ' 不是安全上下文。\n\n解决方法：请改用 http://localhost:8081 访问（本机访问），或配置 HTTPS。\n浏览器只允许在 localhost 或 HTTPS 下使用摄像头。'); return;
+    }
+    // 使用选中的摄像头设备，未选则用默认
+    const sel = document.getElementById('reg-camera-select');
+    const deviceId = sel ? sel.value : '';
+    const constraints = deviceId ? { video: { deviceId: { exact: deviceId } }, audio: false } : { video: true, audio: false };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    regVideoStream = stream;
+    populateCameraSelects(); // 权限已获取，枚举所有摄像头
+    video.classList.add('show');
+    // 确保视频播放
+    video.onloadedmetadata = () => {
+      video.play().catch(e => console.error('play error:', e));
+      setTimeout(() => diagnoseVideo(video), 1500);
+    };
+    video.play().catch(() => {});
+    captureBtn.style.display = 'block';
+    btn.innerHTML = '<svg class="icon"><use href="#icon-stop"/></svg>关闭摄像头';
+  } catch (e) {
+    alert('摄像头开启失败: ' + e.message + '\n\n可能原因：\n1. 摄像头被其他程序占用（如微信、QQ、会议软件）\n2. 浏览器未授权摄像头权限\n3. 没有可用的摄像头设备');
+  }
+}
+// 拍照并录入：抓取当前摄像头画面 + 物体名称 → 提交 /register
+async function captureAndRegister() {
+  const video = document.getElementById('reg-video-live');
+  const name = document.getElementById('reg-name-live').value.trim();
+  const result = document.getElementById('reg-result-live');
+  if (!name) { showResult(result, 'error', '请输入物体名称'); return; }
+  if (!video || !video.videoWidth) { showResult(result, 'error', '摄像头未就绪'); return; }
+  showResult(result, 'loading', '正在拍照录入...');
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('images', blob, 'capture.jpg');
+    const res = await fetch('/register', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.success) {
+      showResult(result, 'success', `✅ ${data.message}`);
+      speak(`已录入${data.object_name}，累计${data.total_images}张`);
+      document.getElementById('reg-name-live').value = ''; // 清空输入框
+      loadDatabase();
+    } else {
+      showResult(result, 'error', data.message);
+    }
+  } catch (e) {
+    showResult(result, 'error', `录入失败: ${e.message}`);
+  }
+}
+// 语音助手：持续监听语音命令（说"识别"/"录入"/"特征库"/"拍照"/"停止"）
+function toggleVoiceAssistant() {
+  const btn = document.getElementById('voice-assist-btn');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge'); return; }
+  if (voiceAssistant) {
+    voiceAssistant = false;
+    awaitingNameInput = false;
+    nameInputTarget = null;
+    if (vaRecognition) { try { vaRecognition.stop(); } catch (e) {} }
+    btn.classList.remove('recording');
+    btn.innerHTML = '<svg class="icon"><use href="#icon-mic"/></svg>语音助手';
+    return;
+  }
+  voiceAssistant = true;
+  btn.classList.add('recording');
+  btn.innerHTML = '<svg class="icon"><use href="#icon-mic-off"/></svg>监听中...';
+  vaRecognition = new SR();
+  vaRecognition.lang = 'zh-CN';
+  vaRecognition.continuous = true;
+  vaRecognition.interimResults = false;
+  vaRecognition.onresult = e => {
+    if (speaking) return; // 播报时忽略，防止麦克风拾到 TTS 声音触发误操作
+    const text = e.results[e.results.length - 1][0].transcript.trim();
+    // 名称录入模式：把识别结果填入指定输入框，而不是当命令处理
+    if (awaitingNameInput && nameInputTarget) {
+      const cleaned = text.replace(/[，。！？、,.!?；;：:""''""''（）()\[\]【】]/g, '').trim();
+      const input = document.getElementById(nameInputTarget);
+      if (input) input.value = cleaned;
+      // 重置该输入框对应的按钮
+      const btn = document.querySelector(`button[onclick="startVoiceInput('${nameInputTarget}')"]`);
+      if (btn) { btn.classList.remove('recording'); btn.innerHTML = '<svg class="icon"><use href="#icon-mic"/></svg>语音输入'; }
+      awaitingNameInput = false;
+      nameInputTarget = null;
+      speak(`名称已录入：${cleaned}`);
+      return;
+    }
+    handleVoiceCommand(text);
+  };
+  vaRecognition.onerror = (e) => {
+    // no-speech 等常见错误不处理，onend 会自动重启
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      alert('麦克风权限被拒绝，请在浏览器设置中允许');
+      voiceAssistant = false;
+      if (vaRecognition) { try { vaRecognition.stop(); } catch (err) {} }
+      const btn = document.getElementById('voice-assist-btn');
+      if (btn) { btn.classList.remove('recording'); btn.innerHTML = '<svg class="icon"><use href="#icon-mic"/></svg>语音助手'; }
+    }
+  };
+  vaRecognition.onend = () => { if (voiceAssistant) { try { vaRecognition.start(); } catch (e) {} } };
+  try { vaRecognition.start(); } catch (e) {}
+  speak('语音助手已开启，请说命令');
+}
+function handleVoiceCommand(text) {
+  if (/这是什么|这是啥|什么东西|看看这个|这什么|这是嘛/.test(text)) {
+    // 语音问"这是什么" → 不跳转页面，直接用当前摄像头截图识别并语音播报
+    forceSpeak = true;
+    const doCapture = () => {
+      if (videoStream && !recognizing) captureAndRecognize();
+      else if (!videoStream) { toggleCamera(); setTimeout(doCapture, 2000); }
+    };
+    doCapture();
+  } else if (/识别|辨认|看看/.test(text)) {
+    switchTab('recognize');
+    setTimeout(() => { if (!videoStream) toggleCamera(); }, 900);
+  } else if (/录入|登记|添加|保存/.test(text)) {
+    // 语音说"录入" → 名称已输入则自动开摄像头并拍照录入
+    const nameInput = document.getElementById('reg-name-live');
+    if (nameInput && nameInput.value.trim()) {
+      const doReg = () => {
+        if (regVideoStream) captureAndRegister();
+        else { toggleRegCamera(); setTimeout(doReg, 2000); }
+      };
+      doReg();
+    } else {
+      switchTab('register');
+      speak('请先说物体名称');
+    }
+  } else if (/特征|库|列表/.test(text)) {
+    switchTab('database');
+  } else if (/拍照|抓拍|截图/.test(text)) {
+    if (videoStream) captureAndRecognize();
+    else speak('摄像头未开启，请先说"识别"打开摄像头');
+  } else if (/停止助手|关闭助手|退出助手|关掉助手/.test(text)) {
+    toggleVoiceAssistant();
+  } else {
+    // 未匹配到命令时不语音打扰，静默等待下一句
+  }
+}
+
+async function toggleCamera() {
+  const video = document.getElementById('rec-video');
+  const btn = document.getElementById('rec-cam-btn');
+  const captureBtn = document.getElementById('rec-capture-btn');
+
+  if (videoStream) {
+    videoStream.getTracks().forEach(t => t.stop());
+    videoStream = null;
+    video.classList.remove('show');
+    captureBtn.style.display = 'none';
+    btn.innerHTML = '<svg class="icon"><use href="#icon-camera"/></svg>开启摄像头';
+    if (autoRecTimer) { clearInterval(autoRecTimer); autoRecTimer = null; }
+    lastRecKey = null;
+    return;
+  }
+
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('摄像头无法访问！\n\n原因：当前地址 ' + location.origin + ' 不是安全上下文。\n\n解决方法：请改用 http://localhost:8081 访问（本机访问），或配置 HTTPS。\n浏览器只允许在 localhost 或 HTTPS 下使用摄像头。'); return;
+    }
+    // 使用选中的摄像头设备，未选则用默认
+    const sel = document.getElementById('rec-camera-select');
+    const deviceId = sel ? sel.value : '';
+    const constraints = deviceId ? { video: { deviceId: { exact: deviceId } }, audio: false } : { video: true, audio: false };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    videoStream = stream;
+    populateCameraSelects(); // 权限已获取，枚举所有摄像头
+    video.classList.add('show');
+    // 确保视频播放（部分浏览器需要等 metadata 加载后再 play）
+    video.onloadedmetadata = () => {
+      video.play().catch(e => console.error('play error:', e));
+      setTimeout(() => diagnoseVideo(video), 1500);
+    };
+    video.play().catch(() => {});
+    captureBtn.style.display = 'block';
+    btn.innerHTML = '<svg class="icon"><use href="#icon-stop"/></svg>关闭摄像头';
+  } catch (e) {
+    alert('摄像头开启失败: ' + e.message + '\n\n可能原因：\n1. 摄像头被其他程序占用（如微信、QQ、会议软件）\n2. 浏览器未授权摄像头权限\n3. 没有可用的摄像头设备');
+  }
+}
+
+// 自动连续识别（摄像头开启时每 1.5s 触发，进行中则跳过）
+async function autoRecognize() {
+  if (recognizing) return;
+  const video = document.getElementById('rec-video');
+  if (!video || !video.videoWidth) return;
+  await captureAndRecognize();
+}
+
+async function captureAndRecognize() {
+  const video = document.getElementById('rec-video');
+  const result = document.getElementById('rec-result');
+  if (!video.videoWidth) { showResult(result, 'error', '摄像头未就绪'); return; }
+  recognizing = true;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
+    await fetchAndRender(blob, 'capture.jpg');
+  } finally {
+    recognizing = false;
+  }
+}
+
+// 上传图片实时预览（选择后立即显示缩略图，确认上传成功）
+function previewUploadFiles() {
+  const files = document.getElementById('rec-files').files;
+  const dropImg = document.getElementById('rec-drop-img');
+  const fnames = document.getElementById('rec-filenames');
+  if (dropImg) {
+    if (files.length) {
+      dropImg.src = URL.createObjectURL(files[0]);
+      dropImg.classList.add('show');
+      dropImg.onload = () => URL.revokeObjectURL(dropImg.src);
+    } else {
+      dropImg.classList.remove('show');
+    }
+  }
+  if (fnames && files.length) fnames.textContent = files.length + ' 张图片已选择';
+  else if (fnames) fnames.textContent = '';
+}
+
+async function recognizeObject() {
+  const files = document.getElementById('rec-files').files;
+  const result = document.getElementById('rec-result-upload');
+  if (!files.length) { showResult(result, 'error', '请上传一张图片'); return; }
+  await fetchAndRender(files[0], files[0].name, 'rec-result-upload');
+}
+
+async function fetchAndRender(blob, filename, resultId = 'rec-result') {
+  const result = document.getElementById(resultId);
+  const btn = document.getElementById('rec-submit');
+  btn.disabled = true;
+  btn.textContent = '正在检索特征...';
+
+  const formData = new FormData();
+  formData.append('image', blob, filename || 'image.jpg');
+
+  try {
+    const resp = await fetch('/recognize', { method: 'POST', body: formData });
+    const data = await resp.json();
+    renderRecognizeResult(result, data);
+  } catch (e) {
+    showResult(result, 'error', '请求失败: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = '开始识别';
+}
+
+function renderRecognizeResult(result, data) {
+  // 自动连续识别时去重：同一物体不重复语音播报（语音指令触发时强制播报）
+  const recKey = (data.object_name || '') + Math.round(data.similarity || 0);
+  const shouldSpeak = forceSpeak || recKey !== lastRecKey;
+  lastRecKey = recKey;
+  forceSpeak = false;
+  if (!data.success) {
+    showResult(result, 'error', `<div class="result-head"><div class="badge-icon"><svg class="icon"><use href="#icon-alert"/></svg></div><div class="result-title">错误</div></div><div class="result-text" style="font-size:1rem;font-weight:600;background:none;-webkit-text-fill-color:#fca5a5">${data.message}</div>`);
+    return;
+  }
+  if (!data.recognized) {
+    let html = `<div class="result-head"><div class="badge-icon"><svg class="icon"><use href="#icon-help"/></svg></div><div class="result-title">未命中特征库</div></div>`;
+    html += `<div class="result-text">${data.object_name || '未知物体'}</div>`;
+    if (data.preview_b64) html += `<img class="result-preview" src="data:image/jpeg;base64,${data.preview_b64}" />`;
+    if (data.imagenet_top3) {
+      html += '<div class="top3-section"><div class="section-title"><svg class="icon"><use href="#icon-database"/></svg>ImageNet 分类参考</div>';
+      html += renderTop3(data.imagenet_top3, true);
+      html += '</div>';
+    }
+    if (data.top3) {
+      html += '<div class="top3-section"><div class="section-title"><svg class="icon"><use href="#icon-trophy"/></svg>特征库 Top3</div>';
+      html += renderTop3(data.top3);
+      html += '</div>';
+    }
+    showResult(result, 'unknown', html);
+    animateProgress();
+    if (shouldSpeak) speak(data.message);
+  } else {
+    let html = `<div class="result-head"><div class="badge-icon"><svg class="icon"><use href="#icon-check"/></svg></div><div class="result-title">识别成功</div></div>`;
+    html += `<div class="result-text">${data.object_name}</div>`;
+    html += `<div class="result-sub">相似度 ${data.similarity}%</div>`;
+    if (data.preview_b64) html += `<img class="result-preview" src="data:image/jpeg;base64,${data.preview_b64}" />`;
+    if (data.top3) {
+      html += '<div class="top3-section"><div class="section-title"><svg class="icon"><use href="#icon-trophy"/></svg>特征库 Top3</div>';
+      html += renderTop3(data.top3);
+      html += '</div>';
+    }
+    showResult(result, 'success', html);
+    animateProgress();
+    if (shouldSpeak) speak(`识别结果：${data.object_name}，相似度${data.similarity}%`);
+  }
+}
+
+function renderTop3(items, isConfidence) {
+  let html = '<div class="top3">';
+  items.forEach((r, i) => {
+    const val = r.similarity || r.confidence || 0;
+    const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : 'rank-3';
+    html += `
+      <div class="top3-item ${rankClass}">
+        <div class="rank">${i+1}</div>
+        <div class="info">
+          <div class="name">${r.name}</div>
+          <div class="sim-bar"><div class="fill" data-target="${val}"></div></div>
+        </div>
+        <div class="sim" data-target="${val}">0.0%</div>
+      </div>`;
+  });
+  return html + '</div>';
+}
+
+function animateProgress() {
+  // 进度条 fill 从 0% 涨到 target（CSS transition 已设 0.9s）
+  setTimeout(() => {
+    document.querySelectorAll('.sim-bar .fill[data-target]').forEach(el => {
+      el.style.width = parseFloat(el.dataset.target) + '%';
+    });
+  }, 60);
+  // 数字 count-up
+  document.querySelectorAll('.sim[data-target]').forEach(el => {
+    const target = parseFloat(el.dataset.target);
+    const start = performance.now();
+    const dur = 900;
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = (target * eased).toFixed(1) + '%';
+      if (t < 1) requestAnimationFrame(tick);
+      else el.textContent = target.toFixed(1) + '%';
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+function showResult(el, type, html) {
+  el.className = 'result-box show ' + type;
+  el.innerHTML = html;
+}
+
+// ===================== 特征库管理 =====================
+// 补充图片模式：列出已有物体供选择
+async function refreshObjectNames() {
+  const grid = document.getElementById('add-name-grid');
+  const hidden = document.getElementById('add-name');
+  if (!grid) return;
+  grid.innerHTML = '<div class="object-card empty">加载中...</div>';
+  try {
+    const res = await fetch('/database');
+    const data = await res.json();
+    grid.innerHTML = '';
+    const objs = data.objects || {};
+    const entries = Object.entries(objs);
+    if (!entries.length) { grid.innerHTML = '<div class="object-card empty">特征库为空，请先录入</div>'; if (hidden) hidden.value = ''; return; }
+    entries.forEach(([name, info]) => {
+      const card = document.createElement('div');
+      card.className = 'object-card';
+      card.dataset.name = name;
+      card.innerHTML = `<div class="obj-name">${name}</div><div class="obj-count">${info.image_count} 张</div>`;
+      card.onclick = () => {
+        grid.querySelectorAll('.object-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        if (hidden) hidden.value = name;
+      };
+      grid.appendChild(card);
+    });
+    if (grid.firstChild) grid.firstChild.click(); // 默认选中第一个
+  } catch (e) {
+    grid.innerHTML = '<div class="object-card empty">加载失败</div>';
+  }
+}
+function previewAddFiles() {
+  const files = document.getElementById('add-files').files;
+  const grid = document.getElementById('add-previews');
+  const dropImg = document.getElementById('add-drop-img');
+  if (dropImg) {
+    if (files.length) {
+      dropImg.src = URL.createObjectURL(files[0]);
+      dropImg.classList.add('show');
+      dropImg.onload = () => URL.revokeObjectURL(dropImg.src);
+    } else {
+      dropImg.classList.remove('show');
+    }
+  }
+  if (grid) grid.innerHTML = ''; // 框内已显示大图，清空下方避免重复
+}
+async function addImagesToObject() {
+  const name = document.getElementById('add-name')?.value;
+  const files = document.getElementById('add-files')?.files;
+  const result = document.getElementById('add-result');
+  if (!name) { showResult(result, 'error', '请选择已有物体'); return; }
+  if (!files || !files.length) { showResult(result, 'error', '请至少上传一张图片'); return; }
+  const fd = new FormData();
+  fd.append('name', name);
+  Array.from(files).forEach(f => fd.append('images', f));
+  showResult(result, 'loading', `正在为「${name}」补充图片...`);
+  try {
+    const res = await fetch('/register', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.success) {
+      showResult(result, 'success', `✅ ${data.message}`);
+      speak(`已为${data.object_name}补充图片，累计${data.total_images}张`);
+      const f = document.getElementById('add-files');
+      const di = document.getElementById('add-drop-img');
+      if (f) f.value = '';
+      if (di) { di.classList.remove('show'); di.removeAttribute('src'); }
+      refreshObjectNames();
+      loadDatabase();
+    } else {
+      showResult(result, 'error', data.message);
+    }
+  } catch (e) {
+    showResult(result, 'error', `请求失败: ${e.message}`);
+  }
+}
+
+async function loadDatabase() {
+  try {
+    const resp = await fetch('/database');
+    const data = await resp.json();
+    const stats = document.getElementById('db-stats');
+    stats.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label"><svg class="icon"><use href="#icon-database"/></svg>物体数量</div>
+        <div class="stat-value">${data.total_objects}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label"><svg class="icon"><use href="#icon-trophy"/></svg>特征总数</div>
+        <div class="stat-value">${data.total_features}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label"><svg class="icon"><use href="#icon-help"/></svg>相似度阈值</div>
+        <div class="stat-value">${(data.threshold*100).toFixed(0)}%</div>
+      </div>
+    `;
+
+    const table = document.getElementById('db-table');
+    const delTable = document.getElementById('db-del-table');
+    if (data.total_objects === 0) {
+      const empty = '<tbody><tr><td class="db-empty" colspan="4">特征库为空，请先录入物体</td></tr></tbody>';
+      if (table) table.innerHTML = empty;
+      if (delTable) delTable.innerHTML = empty;
+      return;
+    }
+    let html = '<thead><tr><th style="width:55%">图片</th><th>物体名称</th><th>数量</th><th>操作</th></tr></thead><tbody>';
+    for (const [name, info] of Object.entries(data.objects)) {
+      // 优先使用带真实索引的图片列表，所有图片都可见并可单独删除
+      const items = info.images || (info.image_urls || []).map((url, index) => ({ url, index }));
+      let imgsHtml = `<div class="db-img-grid">`;
+      items.forEach(it => {
+        imgsHtml += `<div class="db-img-wrap" data-idx="${it.index}">
+          <img src="${it.url}" alt="${name}" class="db-thumb" loading="lazy">
+          <button class="db-img-del" onclick="deleteImage('${name}', ${it.index}, event)" title="删除这张图">×</button>
+        </div>`;
+      });
+      imgsHtml += '</div>';
+      html += `<tr><td><div class="db-img-cell-inner">${imgsHtml}</div></td><td>${name}</td><td>${info.image_count}</td><td><button class="btn-delete" onclick="deleteObject('${name}', event)"><svg class="icon"><use href="#icon-trash"/></svg>删物体</button></td></tr>`;
+    }
+    html += '</tbody>';
+    if (table) table.innerHTML = html;
+    if (delTable) delTable.innerHTML = html;
+  } catch (e) {
+    console.error('Database load error', e);
+  }
+}
+
+// 水漩涡吞噬动画：漩涡占据上半个屏幕，词条从原位旋转缩小飞入漩涡排水口
+function playVortexAnimation(row) {
+  return new Promise(resolve => {
+    if (!row) { resolve(); return; }
+    const rect = row.getBoundingClientRect();
+    const rowX = rect.left + rect.width / 2;
+    const rowY = rect.top + rect.height / 2;
+
+    // 漩涡排水口位于屏幕上半部分（水平居中、约 30vh 处）
+    const drainX = window.innerWidth / 2;
+    const drainY = window.innerHeight * 0.30;
+
+    const stage = document.createElement('div');
+    stage.className = 'vortex-stage';
+    stage.innerHTML =
+      '<div class="vortex-backdrop"></div>' +
+      '<div class="v-ring r1"></div>' +
+      '<div class="v-ring r2"></div>' +
+      '<div class="v-ring r3"></div>' +
+      '<div class="vortex-drain"></div>' +
+      '<div class="vortex-ripple"></div>';
+    stage.style.left = drainX + 'px';
+    stage.style.top = drainY + 'px';
+
+    // 浪花层：围绕排水口的飞溅水花、泡沫环与上升气泡
+    const foam = document.createElement('div');
+    foam.className = 'vortex-foam';
+    let foamHtml = '<div class="foam-ring"></div><div class="foam-ring alt"></div>';
+    for (let i = 0; i < 8; i++) {
+      const a = i * 45;
+      const m = 88 + (i % 3) * 22;        // 飞溅距离 88~132px
+      const d = (i * 0.13).toFixed(2);     // 错开时间
+      foamHtml += `<div class="v-spray" style="--a:${a}deg;--m:${m}px;--d:${d}s"></div>`;
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = i * 60 + 17;
+      const r = 26 + (i % 3) * 10;        // 气泡半径位置
+      const bs = 4 + (i % 3) * 3;          // 气泡大小
+      const d = (i * 0.32).toFixed(2);
+      foamHtml += `<div class="v-bubble" style="--a:${a}deg;--r:${r}px;--bs:${bs}px;--d:${d}s"></div>`;
+    }
+    foam.innerHTML = foamHtml;
+    foam.style.left = drainX + 'px';
+    foam.style.top = drainY + 'px';
+
+    const cells = row.querySelectorAll('td');
+    const nameText = (cells[0] && cells[0].textContent) ? cells[0].textContent.trim() : '';
+    const countText = (cells[1] && cells[1].textContent) ? cells[1].textContent.trim() : '';
+    const ghost = document.createElement('div');
+    ghost.className = 'vortex-ghost';
+    ghost.innerHTML = `<span>${nameText}</span>${countText ? `<span class="g-count">${countText} 张</span>` : ''}`;
+    // 词条从原位出发，飞向漩涡排水口
+    ghost.style.left = rowX + 'px';
+    ghost.style.top = rowY + 'px';
+    ghost.style.setProperty('--tx', (drainX - rowX) + 'px');
+    ghost.style.setProperty('--ty', (drainY - rowY) + 'px');
+
+    // 动画期间隐藏原始行
+    const prevVisibility = row.style.visibility;
+    row.style.visibility = 'hidden';
+
+    document.body.appendChild(stage);
+    document.body.appendChild(foam);
+    document.body.appendChild(ghost);
+    requestAnimationFrame(() => {
+      stage.classList.add('active');
+      foam.style.opacity = '1';
+    });
+
+    // 动画收尾：漩涡 + 浪花淡出 -> 移除节点
+    setTimeout(() => { stage.classList.remove('active'); foam.style.opacity = '0'; }, 1450);
+    setTimeout(() => {
+      stage.remove();
+      foam.remove();
+      ghost.remove();
+      row.style.visibility = prevVisibility;
+      resolve();
+    }, 1750);
+  });
+}
+
+async function deleteObject(name, ev) {
+  if (ev) ev.stopPropagation();
+  if (!confirm(`确认删除物体「${name}」？`)) return;
+  const btn = ev ? (ev.currentTarget || (ev.target && ev.target.closest('button'))) : null;
+  const row = btn ? btn.closest('tr') : null;
+  if (row) await playVortexAnimation(row);
+  try {
+    const fd = new FormData();
+    fd.append('name', name);
+    const resp = await fetch('/delete', { method: 'POST', body: fd });
+    const data = await resp.json();
+    alert(data.message);
+    loadDatabase();
+  } catch (e) {
+    alert('删除失败: ' + e.message);
+    loadDatabase();
+  }
+}
+
+// 删除单张图片（连同对应特征）
+async function deleteImage(name, index, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  if (!confirm(`确认删除「${name}」的第 ${index + 1} 张图片？`)) return;
+  try {
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('index', index);
+    const resp = await fetch('/delete_image', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!data.success) alert(data.message);
+    loadDatabase();
+  } catch (e) {
+    alert('删除图片失败: ' + e.message);
+    loadDatabase();
+  }
+}
+
+// 为已有物体添加更多图片：弹出一个小面板让用户上传/拍照
+function addImagesForObject(name) {
+  const overlay = document.createElement('div');
+  overlay.className = 'addimg-overlay';
+  overlay.innerHTML = `
+    <div class="addimg-panel">
+      <h3>为「${name}」添加图片</h3>
+      <div class="addimg-btns">
+        <button onclick="document.getElementById('addimg-file').click()" class="btn btn-primary">📁 上传图片</button>
+        <button id="addimg-cam-btn" class="btn btn-primary">📷 摄像头拍照</button>
+      </div>
+      <input type="file" id="addimg-file" accept="image/*" multiple style="display:none">
+      <video id="addimg-video" autoplay muted playsinline style="display:none;max-width:100%;border-radius:8px;margin:8px 0"></video>
+      <button id="addimg-capture-btn" class="btn btn-primary" style="display:none">📸 拍照添加</button>
+      <div id="addimg-preview" style="margin-top:8px"></div>
+      <div class="addimg-actions">
+        <button id="addimg-confirm" class="btn btn-primary" disabled>确认添加</button>
+        <button id="addimg-cancel" class="btn">取消</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const fileInput = overlay.querySelector('#addimg-file');
+  const video = overlay.querySelector('#addimg-video');
+  const camBtn = overlay.querySelector('#addimg-cam-btn');
+  const capBtn = overlay.querySelector('#addimg-capture-btn');
+  const preview = overlay.querySelector('#addimg-preview');
+  const confirmBtn = overlay.querySelector('#addimg-confirm');
+  const cancelBtn = overlay.querySelector('#addimg-cancel');
+
+  let pendingFiles = [];
+  let stream = null;
+
+  const refreshPreview = () => {
+    preview.innerHTML = pendingFiles.map((f, i) =>
+      `<div style="display:inline-block;margin:4px"><img src="${URL.createObjectURL(f)}" style="width:60px;height:60px;object-fit:cover;border-radius:6px"><br><small>${i+1}</small></div>`
+    ).join('');
+    confirmBtn.disabled = pendingFiles.length === 0;
+  };
+
+  fileInput.onchange = () => {
+    pendingFiles = Array.from(fileInput.files);
+    refreshPreview();
+  };
+
+  camBtn.onclick = async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      capBtn.style.display = 'inline-block';
+    } catch (e) { alert('无法打开摄像头: ' + e.message); }
+  };
+
+  capBtn.onclick = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      const f = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
+      pendingFiles.push(f);
+      refreshPreview();
+    }, 'image/jpeg', 0.92);
+  };
+
+  confirmBtn.onclick = async () => {
+    if (pendingFiles.length === 0) return;
+    const fd = new FormData();
+    fd.append('name', name);
+    pendingFiles.forEach(f => fd.append('images', f));
+    try {
+      const resp = await fetch('/register', { method: 'POST', body: fd });
+      const data = await resp.json();
+      alert(data.message);
+      close();
+      loadDatabase();
+    } catch (e) {
+      alert('添加失败: ' + e.message);
+    }
+  };
+
+  const close = () => {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    overlay.remove();
+  };
+  cancelBtn.onclick = close;
+  overlay.onclick = e => { if (e.target === overlay) close(); };
+}
+
+// ===================== 语音交互（Web Speech API）=====================
+function speak(text) {
+  if (!('speechSynthesis' in window)) {
+    console.warn('浏览器不支持语音合成');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  speaking = true;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'zh-CN';
+  utter.rate = 1.0;
+  utter.volume = (typeof KNOB !== 'undefined' ? KNOB.volume : 50) / 100;
+  utter.onend = () => { speaking = false; };
+  utter.onerror = () => { speaking = false; };
+  window.speechSynthesis.speak(utter);
+}
+
+function startVoiceInput(targetInputId) {
+  const input = document.getElementById(targetInputId);
+  const btn = document.querySelector(`button[onclick="startVoiceInput('${targetInputId}')"]`);
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    alert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge');
+    return;
+  }
+
+  // 如果正在等名称录入（再次点击）→ 取消
+  if (awaitingNameInput && nameInputTarget === targetInputId) {
+    awaitingNameInput = false;
+    nameInputTarget = null;
+    if (btn) { btn.classList.remove('recording'); btn.innerHTML = '<svg class="icon"><use href="#icon-mic"/></svg>语音输入'; }
+    return;
+  }
+
+  // 如果语音助手没开，先启动它
+  if (!voiceAssistant) {
+    toggleVoiceAssistant();
+  }
+
+  // 进入名称录入模式：复用 vaRecognition，下一句识别结果填入输入框
+  awaitingNameInput = true;
+  nameInputTarget = targetInputId;
+  if (btn) { btn.classList.add('recording'); btn.innerHTML = '<svg class="icon"><use href="#icon-mic-off"/></svg>请说名称...'; }
+  speak('请说物体名称');
+}
+
+// ===================== Panel 主题装饰注入 =====================
+function buildPanelDeco() {
+  const STAR = 'M12 2 L14.4 9.4 L22 9.5 L16 13.8 L18 21 L12 16.5 L6 21 L8 13.8 L2 9.5 L9.6 9.4 Z';
+  const decos = {
+    // ============ 银河：12 颗星 + 月牙 + 3 流星 + 土星 + 行星 + 星座连线 + 星云团 ============
+    galaxy: () => `
+      <!-- 星云团（径向渐变模糊圆）-->
+      <svg style="top:25%;right:30%;width:120px;height:120px" viewBox="0 0 100 100">
+        <defs><radialGradient id="neb1"><stop offset="0%" stop-color="#a855f7" stop-opacity="0.35"/><stop offset="100%" stop-color="#a855f7" stop-opacity="0"/></radialGradient></defs>
+        <circle cx="50" cy="50" r="45" fill="url(#neb1)"/>
+      </svg>
+      <svg style="bottom:18%;left:8%;width:90px;height:90px" viewBox="0 0 100 100">
+        <defs><radialGradient id="neb2"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></radialGradient></defs>
+        <circle cx="50" cy="50" r="40" fill="url(#neb2)"/>
+      </svg>
+      <!-- 月牙 -->
+      <svg class="deco-moon" style="top:5%;left:4%;width:28px;height:28px;color:#fde68a" viewBox="0 0 24 24">
+        <path d="M16 4 A8 8 0 1 0 16 20 A6 6 0 1 1 16 4 Z" fill="currentColor"/>
+      </svg>
+      <!-- 土星 -->
+      <svg class="deco-moon" style="bottom:8%;right:30%;width:34px;height:20px;color:#fbbf24" viewBox="0 0 40 24">
+        <ellipse cx="20" cy="12" rx="8" ry="8" fill="currentColor" opacity="0.85"/>
+        <ellipse cx="20" cy="12" rx="18" ry="4" fill="none" stroke="#fde68a" stroke-width="1.5" opacity="0.7"/>
+      </svg>
+      <!-- 行星带环 -->
+      <svg class="deco-star delay-2" style="top:45%;left:8%;width:20px;height:14px;color:#a78bfa" viewBox="0 0 24 14">
+        <circle cx="12" cy="7" r="5" fill="currentColor" opacity="0.8"/>
+        <ellipse cx="12" cy="7" rx="11" ry="2.5" fill="none" stroke="#c4b5fd" stroke-width="0.8" opacity="0.6"/>
+      </svg>
+      <!-- 12 颗散落星星 -->
+      <svg class="deco-star" style="top:6%;right:5%;width:20px;height:20px;color:#fde68a" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-1" style="top:10%;right:24%;width:13px;height:13px;color:#c4b5fd" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-2" style="top:18%;right:14%;width:10px;height:10px;color:#a5b4fc" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-3" style="top:30%;right:8%;width:14px;height:14px;color:#fde68a" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-1" style="top:42%;right:35%;width:8px;height:8px;color:#c4b5fd" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-2" style="top:55%;right:18%;width:11px;height:11px;color:#fde68a" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-3" style="top:68%;right:6%;width:13px;height:13px;color:#c4b5fd" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star" style="bottom:14%;right:6%;width:11px;height:11px;color:#c4b5fd" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-1" style="bottom:6%;right:18%;width:9px;height:9px;color:#a5b4fc" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-2" style="bottom:20%;right:42%;width:7px;height:7px;color:#fde68a" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star delay-3" style="top:14%;left:22%;width:8px;height:8px;color:#c4b5fd" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <svg class="deco-star" style="bottom:30%;left:5%;width:10px;height:10px;color:#fde68a" viewBox="0 0 24 24"><path d="${STAR}" fill="currentColor"/></svg>
+      <!-- 星座连线 -->
+      <svg style="top:10%;right:8%;width:120px;height:80px;opacity:0.4" viewBox="0 0 120 80">
+        <line x1="10" y1="10" x2="40" y2="30" stroke="#c4b5fd" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <line x1="40" y1="30" x2="80" y2="15" stroke="#c4b5fd" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <line x1="80" y1="15" x2="100" y2="50" stroke="#c4b5fd" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <line x1="40" y1="30" x2="60" y2="65" stroke="#c4b5fd" stroke-width="0.8" stroke-dasharray="2 2"/>
+      </svg>
+      <!-- 3 条流星 -->
+      <svg class="deco-shooting" style="top:30%;right:12%;width:70px;height:36px" viewBox="0 0 70 36">
+        <defs><linearGradient id="sg1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#fff" stop-opacity="0"/><stop offset="100%" stop-color="#fff" stop-opacity="1"/></linearGradient></defs>
+        <line x1="6" y1="30" x2="64" y2="6" stroke="url(#sg1)" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="64" cy="6" r="2.5" fill="#fff"/>
+      </svg>
+      <svg class="deco-shooting" style="top:60%;right:25%;width:50px;height:26px;animation-delay:2s" viewBox="0 0 50 26">
+        <defs><linearGradient id="sg2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#fde68a" stop-opacity="0"/><stop offset="100%" stop-color="#fde68a" stop-opacity="1"/></linearGradient></defs>
+        <line x1="4" y1="22" x2="46" y2="4" stroke="url(#sg2)" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <svg class="deco-shooting" style="bottom:25%;right:50%;width:60px;height:32px;animation-delay:4s" viewBox="0 0 60 32">
+        <defs><linearGradient id="sg3" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#c4b5fd" stop-opacity="0"/><stop offset="100%" stop-color="#c4b5fd" stop-opacity="1"/></linearGradient></defs>
+        <line x1="5" y1="26" x2="55" y2="6" stroke="url(#sg3)" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    `,
+
+    // ============ 深林：3 条藤蔓 + 7 片飘叶 + 蘑菇 + 蜗牛 + 萤火虫 + 花 ============
+    forest: () => `
+      <!-- 主藤蔓（右侧缠绕）-->
+      <svg class="deco-vine" style="top:-12px;right:-18px;width:70px;height:80%" viewBox="0 0 70 400" preserveAspectRatio="none">
+        <path d="M35 0 Q15 50 45 100 Q60 150 25 200 Q10 250 40 300 Q60 350 30 400"
+              stroke="#22c55e" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+        <g fill="#4ade80" stroke="#16a34a" stroke-width="0.6" opacity="0.85">
+          <ellipse cx="15" cy="50" rx="10" ry="4.5" transform="rotate(45 15 50)"/>
+          <ellipse cx="60" cy="100" rx="10" ry="4.5" transform="rotate(-30 60 100)"/>
+          <ellipse cx="15" cy="150" rx="10" ry="4.5" transform="rotate(30 15 150)"/>
+          <ellipse cx="60" cy="200" rx="10" ry="4.5" transform="rotate(-45 60 200)"/>
+          <ellipse cx="15" cy="250" rx="10" ry="4.5" transform="rotate(60 15 250)"/>
+          <ellipse cx="60" cy="300" rx="10" ry="4.5" transform="rotate(-30 60 300)"/>
+          <ellipse cx="15" cy="350" rx="10" ry="4.5" transform="rotate(45 15 350)"/>
+        </g>
+        <g stroke="#22c55e" stroke-width="1.2" fill="none" opacity="0.6">
+          <path d="M45 100 Q55 110 60 100 Q55 90 45 100"/>
+          <path d="M25 200 Q15 210 10 200 Q15 190 25 200"/>
+          <path d="M40 300 Q50 310 55 300 Q50 290 40 300"/>
+        </g>
+      </svg>
+      <!-- 副藤蔓（左下横向）-->
+      <svg class="deco-vine" style="bottom:-12px;left:-15px;width:55%;height:60px" viewBox="0 0 220 60" preserveAspectRatio="none">
+        <path d="M0 30 Q55 5 110 30 T220 30" stroke="#22c55e" stroke-width="2" fill="none" opacity="0.55"/>
+        <g fill="#4ade80" stroke="#16a34a" stroke-width="0.5" opacity="0.75">
+          <ellipse cx="35" cy="22" rx="8" ry="3.5" transform="rotate(-30 35 22)"/>
+          <ellipse cx="90" cy="38" rx="8" ry="3.5" transform="rotate(30 90 38)"/>
+          <ellipse cx="140" cy="22" rx="8" ry="3.5" transform="rotate(-30 140 22)"/>
+          <ellipse cx="195" cy="38" rx="8" ry="3.5" transform="rotate(30 195 38)"/>
+        </g>
+      </svg>
+      <!-- 第三条藤蔓（左侧顶部下垂）-->
+      <svg class="deco-vine" style="top:-10px;left:-12px;width:50px;height:50%" viewBox="0 0 50 250" preserveAspectRatio="none">
+        <path d="M25 0 Q40 50 20 100 Q5 150 30 200 Q45 230 25 250" stroke="#16a34a" stroke-width="2" fill="none" opacity="0.55"/>
+        <g fill="#65a30d" opacity="0.7">
+          <ellipse cx="40" cy="50" rx="8" ry="4" transform="rotate(-30 40 50)"/>
+          <ellipse cx="5" cy="150" rx="8" ry="4" transform="rotate(30 5 150)"/>
+          <ellipse cx="40" cy="220" rx="8" ry="4" transform="rotate(-30 40 220)"/>
+        </g>
+      </svg>
+      <!-- 蘑菇（红伞白点 + 白柄）-->
+      <svg style="bottom:6%;right:8%;width:24px;height:26px" viewBox="0 0 24 26">
+        <rect x="9" y="14" width="6" height="10" rx="1" fill="#fef3c7" opacity="0.85"/>
+        <path d="M2 14 Q2 4 12 4 Q22 4 22 14 Z" fill="#dc2626" opacity="0.85"/>
+        <circle cx="7" cy="9" r="1.5" fill="#fef3c7"/>
+        <circle cx="14" cy="7" r="1.2" fill="#fef3c7"/>
+        <circle cx="18" cy="11" r="1.3" fill="#fef3c7"/>
+      </svg>
+      <!-- 蜗牛 -->
+      <svg style="bottom:12%;right:18%;width:26px;height:18px" viewBox="0 0 26 18">
+        <path d="M2 14 L18 14 Q22 14 22 10 Q22 4 16 4 Q10 4 10 10 Q10 14 14 14" stroke="#84cc16" stroke-width="1.5" fill="none" opacity="0.7"/>
+        <circle cx="14" cy="10" r="3" fill="none" stroke="#65a30d" stroke-width="1" opacity="0.6"/>
+        <path d="M18 14 L24 16 M18 12 L24 10" stroke="#65a30d" stroke-width="0.6" opacity="0.5"/>
+      </svg>
+      <!-- 花朵 -->
+      <svg class="deco-leaf-spin" style="top:20%;right:8%;width:18px;height:18px" viewBox="0 0 24 24">
+        <g fill="#f0abfc" opacity="0.75">
+          <ellipse cx="12" cy="4" rx="3" ry="5"/>
+          <ellipse cx="20" cy="12" rx="5" ry="3"/>
+          <ellipse cx="12" cy="20" rx="3" ry="5"/>
+          <ellipse cx="4" cy="12" rx="5" ry="3"/>
+        </g>
+        <circle cx="12" cy="12" r="2.5" fill="#fbbf24"/>
+      </svg>
+      <!-- 5 片飘落叶子（不同位置）-->
+      <svg class="deco-leaf-spin" style="top:18%;left:8%;width:16px;height:16px;color:#84cc16" viewBox="0 0 24 24"><path d="M12 2 C8 6 6 14 12 22 C18 14 16 6 12 2 Z" fill="currentColor" opacity="0.75" stroke="#65a30d" stroke-width="0.6"/><line x1="12" y1="2" x2="12" y2="22" stroke="#65a30d" stroke-width="0.6"/></svg>
+      <svg class="deco-leaf-spin" style="top:45%;left:14%;width:14px;height:14px;color:#eab308" viewBox="0 0 24 24"><path d="M12 2 C8 6 6 14 12 22 C18 14 16 6 12 2 Z" fill="currentColor" opacity="0.7" stroke="#a16207" stroke-width="0.6"/><line x1="12" y1="2" x2="12" y2="22" stroke="#a16207" stroke-width="0.6"/></svg>
+      <svg class="deco-leaf-spin" style="top:65%;left:22%;width:12px;height:12px;color:#f97316" viewBox="0 0 24 24"><path d="M12 2 C8 6 6 14 12 22 C18 14 16 6 12 2 Z" fill="currentColor" opacity="0.65" stroke="#c2410c" stroke-width="0.6"/><line x1="12" y1="2" x2="12" y2="22" stroke="#c2410c" stroke-width="0.6"/></svg>
+      <svg class="deco-leaf-spin" style="top:35%;left:32%;width:10px;height:10px;color:#dc2626" viewBox="0 0 24 24"><path d="M12 2 C8 6 6 14 12 22 C18 14 16 6 12 2 Z" fill="currentColor" opacity="0.7" stroke="#991b1b" stroke-width="0.6"/><line x1="12" y1="2" x2="12" y2="22" stroke="#991b1b" stroke-width="0.6"/></svg>
+      <svg class="deco-leaf-spin" style="top:78%;left:10%;width:13px;height:13px;color:#84cc16" viewBox="0 0 24 24"><path d="M12 2 C8 6 6 14 12 22 C18 14 16 6 12 2 Z" fill="currentColor" opacity="0.7" stroke="#65a30d" stroke-width="0.6"/><line x1="12" y1="2" x2="12" y2="22" stroke="#65a30d" stroke-width="0.6"/></svg>
+      <!-- 萤火虫 3 只 -->
+      <svg class="deco-moon" style="top:25%;left:25%;width:6px;height:6px;color:#fbbf24" viewBox="0 0 6 6"><circle cx="3" cy="3" r="2.5" fill="currentColor"/></svg>
+      <svg class="deco-moon" style="top:55%;left:18%;width:5px;height:5px;color:#fde047" viewBox="0 0 6 6"><circle cx="3" cy="3" r="2" fill="currentColor"/></svg>
+      <svg class="deco-moon" style="top:72%;left:35%;width:6px;height:6px;color:#fbbf24" viewBox="0 0 6 6"><circle cx="3" cy="3" r="2.5" fill="currentColor"/></svg>
+      <!-- 蝴蝶 -->
+      <svg class="deco-leaf-spin" style="top:30%;right:15%;width:18px;height:14px;color:#a855f7" viewBox="0 0 24 18">
+        <path d="M12 9 Q4 0 2 9 Q4 16 12 9" fill="currentColor" opacity="0.7"/>
+        <path d="M12 9 Q20 0 22 9 Q20 16 12 9" fill="currentColor" opacity="0.7"/>
+        <line x1="12" y1="3" x2="12" y2="14" stroke="#6b21a8" stroke-width="0.8"/>
+      </svg>
+    `,
+
+    // ============ 海滩：4 贝壳 + 2 海星 + 海螺 + 珊瑚 + 海鸥 + 椰叶 + 沙粒 + 泡沫 ============
+    beach: () => `
+      <!-- 大扇贝 -->
+      <svg class="deco-shell" style="bottom:6%;left:3%;width:38px;height:34px;color:#fde68a" viewBox="0 0 40 36">
+        <path d="M2 32 Q2 6 20 4 Q38 6 38 32 Z" fill="currentColor" opacity="0.75" stroke="#f59e0b" stroke-width="0.6"/>
+        <line x1="20" y1="4" x2="5" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="12" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="20" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="28" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="35" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+      </svg>
+      <!-- 小扇贝 -->
+      <svg class="deco-shell" style="bottom:14%;left:11%;width:24px;height:22px;color:#fbbf24" viewBox="0 0 40 36">
+        <path d="M2 32 Q2 6 20 4 Q38 6 38 32 Z" fill="currentColor" opacity="0.65" stroke="#f59e0b" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="5" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="20" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="35" y2="32" stroke="#f59e0b" stroke-width="0.5"/>
+      </svg>
+      <!-- 粉色贝壳 -->
+      <svg class="deco-shell" style="bottom:8%;left:18%;width:22px;height:20px;color:#f9a8d4" viewBox="0 0 40 36">
+        <path d="M2 32 Q2 6 20 4 Q38 6 38 32 Z" fill="currentColor" opacity="0.7" stroke="#db2777" stroke-width="0.5"/>
+        <line x1="20" y1="4" x2="5" y2="32" stroke="#db2777" stroke-width="0.4"/>
+        <line x1="20" y1="4" x2="20" y2="32" stroke="#db2777" stroke-width="0.4"/>
+        <line x1="20" y1="4" x2="35" y2="32" stroke="#db2777" stroke-width="0.4"/>
+      </svg>
+      <!-- 海螺（螺旋形）-->
+      <svg class="deco-shell" style="bottom:18%;left:6%;width:22px;height:28px;color:#fed7aa" viewBox="0 0 24 32">
+        <path d="M12 28 Q4 28 4 18 Q4 8 12 8 Q20 8 20 16 Q20 22 14 22 Q10 22 10 18 Q10 16 12 16" stroke="#ea580c" stroke-width="1.5" fill="currentColor" opacity="0.7"/>
+      </svg>
+      <!-- 海星 1（橙色，自转）-->
+      <svg class="deco-starfish" style="top:8%;right:5%;width:28px;height:28px;color:#fb923c" viewBox="0 0 24 24">
+        <path d="M12 2 L14.5 9 L22 9 L16 14 L18 22 L12 17 L6 22 L8 14 L2 9 L9.5 9 Z" fill="currentColor" opacity="0.85" stroke="#ea580c" stroke-width="0.4"/>
+      </svg>
+      <!-- 海星 2（粉色，小）-->
+      <svg class="deco-starfish" style="top:22%;right:14%;width:18px;height:18px;color:#f472b6" viewBox="0 0 24 24">
+        <path d="M12 2 L14.5 9 L22 9 L16 14 L18 22 L12 17 L6 22 L8 14 L2 9 L9.5 9 Z" fill="currentColor" opacity="0.75" stroke="#db2777" stroke-width="0.4"/>
+      </svg>
+      <!-- 珊瑚（树枝形）-->
+      <svg style="bottom:8%;right:8%;width:34px;height:34px;color:#f472b6" viewBox="0 0 34 34">
+        <g stroke="currentColor" stroke-width="2" fill="none" opacity="0.7" stroke-linecap="round">
+          <path d="M17 32 L17 22"/>
+          <path d="M17 22 L11 16 M17 22 L23 16"/>
+          <path d="M11 16 L7 12 M11 16 L13 10"/>
+          <path d="M23 16 L21 10 M23 16 L27 12"/>
+          <path d="M7 12 L5 8 M13 10 L13 6 M21 10 L21 6 M27 12 L29 8"/>
+        </g>
+      </svg>
+      <!-- 椰叶（更大更复杂）-->
+      <svg style="bottom:5%;right:20%;width:36px;height:32px;color:#16a34a" viewBox="0 0 32 32">
+        <path d="M16 4 Q26 8 28 18 Q22 14 16 16 Q22 22 16 28 Q10 22 16 16 Q10 14 4 18 Q6 8 16 4 Z" fill="currentColor" opacity="0.55"/>
+        <line x1="16" y1="4" x2="16" y2="28" stroke="#15803d" stroke-width="0.5"/>
+      </svg>
+      <!-- 海鸥剪影（2 只）-->
+      <svg class="deco-leaf-spin" style="top:10%;left:20%;width:20px;height:8px;color:#0c4a6e" viewBox="0 0 24 8">
+        <path d="M2 6 Q6 0 8 4 Q12 0 12 4 Q12 0 16 4 Q18 0 22 6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.8"/>
+      </svg>
+      <svg class="deco-leaf-spin" style="top:18%;left:35%;width:16px;height:6px;color:#0c4a6e" viewBox="0 0 24 8">
+        <path d="M2 6 Q6 0 8 4 Q12 0 12 4 Q12 0 16 4 Q18 0 22 6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+      </svg>
+      <!-- 沙粒（一组小点）-->
+      <svg style="bottom:2%;left:0;right:0;width:100%;height:10px" viewBox="0 0 200 10" preserveAspectRatio="none">
+        <g fill="#fde68a" opacity="0.6">
+          <circle cx="20" cy="5" r="1"/><circle cx="40" cy="7" r="0.8"/><circle cx="65" cy="4" r="1.2"/>
+          <circle cx="85" cy="6" r="0.9"/><circle cx="105" cy="5" r="1.1"/><circle cx="125" cy="7" r="0.8"/>
+          <circle cx="150" cy="5" r="1"/><circle cx="175" cy="6" r="0.9"/><circle cx="195" cy="5" r="1.2"/>
+        </g>
+      </svg>
+      <!-- 海浪泡沫（底部白纹）-->
+      <svg style="bottom:0;left:0;right:0;width:100%;height:14px" viewBox="0 0 200 14" preserveAspectRatio="none">
+        <path d="M0 7 Q20 2 40 7 T80 7 T120 7 T160 7 T200 7 V14 H0 Z" fill="#fff" opacity="0.18"/>
+      </svg>
+      <!-- 气泡（散布）-->
+      <svg class="deco-shell" style="top:35%;right:18%;width:14px;height:14px" viewBox="0 0 14 14">
+        <circle cx="7" cy="7" r="6" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.4)" stroke-width="0.6"/>
+        <circle cx="5" cy="5" r="1.5" fill="rgba(255,255,255,0.5)"/>
+      </svg>
+      <svg class="deco-shell" style="top:50%;right:8%;width:10px;height:10px" viewBox="0 0 10 10">
+        <circle cx="5" cy="5" r="4" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.35)" stroke-width="0.5"/>
+        <circle cx="3.5" cy="3.5" r="1" fill="rgba(255,255,255,0.45)"/>
+      </svg>
+    `
+  };
+  document.querySelectorAll('.panel-deco').forEach(el => {
+    const fn = decos[el.dataset.theme];
+    if (fn) el.innerHTML = fn();
+  });
+}
+buildPanelDeco();
+
+// 页面打开时无唱片在转盘：背景纯黑 + LCD 熄灭（录入面板仍可见，点击唱片才上转盘）
+
+// 初始化加载阈值
+fetch('/health').then(r => r.json()).then(d => {
+  const el = document.getElementById('threshold-display');
+  if (el) el.textContent = (d.threshold * 100).toFixed(0) + '%';
+});
+</script>
+</body>
+</html>

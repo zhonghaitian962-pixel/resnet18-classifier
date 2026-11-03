@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Demo C · 专辑封面卡</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+    background: #050816;
+    color: #f1f5f9;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  #starfield { position: fixed; inset:0; z-index:0; }
+  .wrap { position: relative; z-index:1; max-width: 960px; margin: 0 auto; }
+  .title-bar { text-align:center; margin-bottom: 16px; }
+  .title-bar .badge {
+    display:inline-block; font-size:11px; color:#a5b4fc;
+    background:rgba(99,102,241,0.15); padding:3px 10px;
+    border-radius:999px; margin-bottom:6px;
+  }
+  .title-bar h1 { font-size:18px; font-weight:700; }
+  .title-bar p { color:#94a3b8; font-size:12px; margin-top:4px; }
+
+  .turntable-body {
+    background: linear-gradient(135deg, #3d2817, #2a1810, #1f1108);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    border: 1px solid #4a2f1c;
+  }
+  .top-row {
+    display: grid;
+    grid-template-columns: 116px 1fr 280px;
+    gap: 16px;
+    align-items: center;
+  }
+  .vinyl-rack {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #5a3a25;
+    border-radius: 12px;
+    padding: 10px 8px;
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 240px;
+  }
+  .vinyl {
+    width: 96px; height: 96px; border-radius: 50%;
+    background: repeating-radial-gradient(circle at center, #1a1a1a 0, #1a1a1a 2px, #0a0a0a 2px, #0a0a0a 4px);
+    border: 2px solid #000; cursor: pointer;
+    position: relative; transition: transform 0.3s ease;
+  }
+  .vinyl::before { content:''; position:absolute; inset:35%; border-radius:50%; }
+  .vinyl.red::before { background:#e74c3c; }
+  .vinyl.blue::before { background:#3498db; }
+  .vinyl.green::before { background:#27ae60; }
+  .vinyl::after { content:''; position:absolute; left:50%; top:50%; width:6px; height:6px; background:#000; border-radius:50%; transform:translate(-50%,-50%); }
+  .vinyl:hover { transform: scale(1.05); }
+
+  /* 中部专辑封面卡（方案 C 核心）*/
+  .cover-area {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; min-height: 240px;
+    position: relative;
+  }
+  .now-playing-tag {
+    font-size: 10px; color: #d4af37;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .now-playing-tag::before, .now-playing-tag::after {
+    content:''; width: 20px; height: 1px;
+    background: linear-gradient(90deg, transparent, #d4af37);
+  }
+  .now-playing-tag::after {
+    background: linear-gradient(90deg, #d4af37, transparent);
+  }
+  .cover-card {
+    width: 220px; height: 220px;
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.5s cubic-bezier(0.34,1.4,0.64,1);
+  }
+  .cover-card:hover { transform: scale(1.03); }
+  .cover-bg {
+    position: absolute; inset: 0;
+  }
+  /* 三张主题封面背景 */
+  .cover-galaxy .cover-bg {
+    background:
+      radial-gradient(ellipse at top, #4c1d95 0%, #1e1b4b 60%, #0f0a2e 100%);
+  }
+  .cover-forest .cover-bg {
+    background:
+      radial-gradient(ellipse at bottom, #14532d 0%, #052e16 60%, #022c22 100%);
+  }
+  .cover-beach .cover-bg {
+    background:
+      linear-gradient(180deg, #0c4a6e 0%, #075985 40%, #0e7490 75%, #fde68a 100%);
+  }
+  /* 装饰：星星 */
+  .cover-galaxy .deco {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle, #fff 0.5px, transparent 1px),
+      radial-gradient(circle, #c4b5fd 0.5px, transparent 1px),
+      radial-gradient(circle, #fde68a 0.5px, transparent 1px);
+    background-size: 30px 30px, 50px 50px, 70px 70px;
+    background-position: 5px 10px, 25px 40px, 15px 25px;
+  }
+  .cover-galaxy .moon {
+    position: absolute; top: 20px; right: 20px;
+    width: 30px; height: 30px;
+    background: #fde68a;
+    border-radius: 50%;
+    box-shadow: 0 0 20px rgba(253,230,138,0.6);
+  }
+  /* 装饰：藤蔓叶子 */
+  .cover-forest .deco {
+    position: absolute; inset: 0;
+  }
+  .cover-forest .leaf {
+    position: absolute;
+    width: 14px; height: 14px;
+    background: #4ade80;
+    border-radius: 50% 0 50% 0;
+    transform: rotate(45deg);
+    opacity: 0.7;
+  }
+  /* 装饰：贝壳+海浪 */
+  .cover-beach .deco {
+    position: absolute; inset: 0;
+  }
+  .cover-beach .shell {
+    position: absolute;
+    bottom: 30px; left: 20px;
+    width: 24px; height: 22px;
+    background: #fde68a;
+    border-radius: 50% 50% 0 0;
+    opacity: 0.8;
+    box-shadow: 0 0 8px rgba(253,230,138,0.4);
+  }
+  .cover-beach .wave {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 20px;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.3));
+  }
+  /* 文字层 */
+  .cover-text {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 2; text-align: center;
+    padding: 20px;
+  }
+  .cover-emoji { font-size: 36px; margin-bottom: 8px; }
+  .cover-title {
+    font-size: 18px; font-weight: 700;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    margin-bottom: 4px;
+  }
+  .cover-artist {
+    font-size: 11px; color: rgba(255,255,255,0.8);
+    letter-spacing: 0.1em;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
+  .cover-bottom-text {
+    position: absolute; bottom: 8px; left: 0; right: 0;
+    text-align: center; font-size: 9px;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.15em;
+  }
+
+  /* 右侧转盘 */
+  .turntable-deck {
+    position: relative; height: 240px;
+    background: radial-gradient(ellipse at center, #1a0f08, #0a0500);
+    border-radius: 12px; border: 1px solid #4a2f1c;
+  }
+  .platter {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #2a2a2a, #0a0a0a);
+    box-shadow: 0 0 30px rgba(168,85,247,0.3);
+    border: 2px solid #1a1a1a;
+  }
+  .platter::before { content:''; position:absolute; inset:0; border-radius:50%; background: repeating-radial-gradient(circle at center, transparent 0, transparent 4px, rgba(255,255,255,0.03) 4px, rgba(255,255,255,0.03) 5px); }
+  .platter::after { content:''; position:absolute; left:50%; top:50%; width:8px; height:8px; background:#444; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 0 4px rgba(0,0,0,0.8); }
+  .vinyl-active {
+    position: absolute;
+    width: 180px !important; height: 180px !important;
+    top: 50% !important; left: 50% !important;
+    transform: translate(-50%,-50%) !important;
+    animation: spin 4s linear infinite;
+    z-index: 2;
+  }
+  @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+  .tonearm {
+    position: absolute; top: 6px; right: 6px;
+    width: 100px; height: 14px;
+    background: linear-gradient(90deg, #4a4a4a, #2a2a2a);
+    border-radius: 7px;
+    transform-origin: right center;
+    transform: rotate(20deg);
+    transition: transform 0.5s ease;
+    z-index: 3;
+  }
+  .tonearm.active { transform: rotate(38deg); }
+  .tonearm::before { content:''; position:absolute; right:-4px; top:-6px; width:24px; height:24px; background:#3a3a3a; border-radius:50%; border:2px solid #5a5a5a; }
+  .tonearm::after { content:''; position:absolute; left:-4px; top:6px; width:10px; height:8px; background:#d4af37; border-radius:2px; }
+  .bottom-deco { height: 18px; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.4), transparent); border-radius: 4px; margin-top: 12px; display:flex; justify-content:center; align-items:center; gap:4px; }
+  .bottom-deco span { width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,0.1); }
+  .hint { text-align:center; color:#94a3b8; font-size:11px; margin-top:12px; }
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div class="wrap">
+  <div class="title-bar">
+    <span class="badge">方案 C</span>
+    <h1>专辑封面卡</h1>
+    <p>中部放「正在播放」专辑封面卡 · 每个 tab 对应一张主题封面</p>
+  </div>
+
+  <div class="turntable-body">
+    <div class="top-row">
+      <div class="vinyl-rack">
+        <div class="vinyl red" data-tab="galaxy"></div>
+        <div class="vinyl blue" data-tab="forest"></div>
+        <div class="vinyl green" data-tab="beach"></div>
+      </div>
+
+      <!-- 中部专辑封面卡（方案 C 核心）-->
+      <div class="cover-area">
+        <div class="now-playing-tag">NOW PLAYING</div>
+        <div class="cover-card" id="cover-card">
+          <div class="cover-bg"></div>
+          <div class="deco" id="cover-deco"></div>
+          <div class="cover-text" id="cover-text">
+            <div class="cover-emoji">🎵</div>
+            <div class="cover-title">载入中…</div>
+            <div class="cover-artist">—</div>
+          </div>
+          <div class="cover-bottom-text">RESNET-18 · 512 DIM</div>
+        </div>
+      </div>
+
+      <div class="turntable-deck">
+        <div class="platter" id="platter"></div>
+        <div class="tonearm" id="tonearm"></div>
+      </div>
+    </div>
+    <div class="bottom-deco">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+  <p class="hint">↑ 中部专辑封面卡 · 切换 tab 时封面卡换主题色 + 装饰元素</p>
+</div>
+
+<script>
+const sf = document.getElementById('starfield');
+const sctx = sf.getContext('2d');
+let stars = [];
+function resizeSF(){ sf.width=innerWidth; sf.height=innerHeight;
+  stars = Array.from({length:150},()=>({x:Math.random()*sf.width,y:Math.random()*sf.height,r:Math.random()*1.5+0.3,a:Math.random(),s:Math.random()*0.02+0.005,c:Math.random()<0.3?'#c4b5fd':Math.random()<0.5?'#a5b4fc':'#fff'}));
+}
+resizeSF(); addEventListener('resize',resizeSF);
+function drawSF(){ sctx.clearRect(0,0,sf.width,sf.height);
+  stars.forEach(s=>{ s.a+=s.s; if(s.a>1||s.a<0)s.s=-s.s;
+    sctx.globalAlpha=Math.abs(Math.sin(s.a*3.14));
+    sctx.fillStyle=s.c; sctx.beginPath(); sctx.arc(s.x,s.y,s.r,0,7); sctx.fill(); });
+  requestAnimationFrame(drawSF);
+}
+drawSF();
+
+const covers = {
+  galaxy: {
+    cls: 'cover-galaxy',
+    emoji: '🌟',
+    title: '星河录',
+    artist: 'ResNet-18 · A 面',
+    deco: '<div class="moon"></div>'
+  },
+  forest: {
+    cls: 'cover-forest',
+    emoji: '🍃',
+    title: '深林识',
+    artist: 'ResNet-18 · B 面',
+    deco: '<div class="leaf" style="top:30px;left:30px;"></div><div class="leaf" style="top:60px;right:40px;transform:rotate(120deg);"></div><div class="leaf" style="bottom:50px;left:50px;transform:rotate(200deg);"></div><div class="leaf" style="bottom:30px;right:30px;transform:rotate(300deg);"></div>'
+  },
+  beach: {
+    cls: 'cover-beach',
+    emoji: '🐚',
+    title: '潮汐库',
+    artist: 'ResNet-18 · C 面',
+    deco: '<div class="shell"></div><div class="shell" style="left:60px;bottom:50px;width:18px;height:16px;"></div><div class="wave"></div>'
+  }
+};
+const platter = document.getElementById('platter');
+const tonearm = document.getElementById('tonearm');
+const coverCard = document.getElementById('cover-card');
+const coverDeco = document.getElementById('cover-deco');
+const coverText = document.getElementById('cover-text');
+
+function switchTab(tab) {
+  const c = covers[tab];
+  coverCard.className = 'cover-card ' + c.cls;
+  coverDeco.innerHTML = c.deco;
+  coverText.innerHTML = `
+    <div class="cover-emoji">${c.emoji}</div>
+    <div class="cover-title">${c.title}</div>
+    <div class="cover-artist">${c.artist}</div>
+  `;
+
+  document.querySelectorAll('.vinyl').forEach(v=>{ v.classList.remove('vinyl-active'); v.style.cssText=''; });
+  const colorMap = {galaxy:'red',forest:'blue',beach:'green'};
+  const src = document.querySelector(`.vinyl.${colorMap[tab]}`);
+  if (src) {
+    platter.querySelectorAll('.vinyl-active').forEach(c=>c.remove());
+    const clone = src.cloneNode(true);
+    clone.classList.add('vinyl-active');
+    clone.removeAttribute('data-tab');
+    platter.appendChild(clone);
+  }
+  tonearm.classList.add('active');
+}
+document.querySelectorAll('.vinyl').forEach(v=>{
+  v.addEventListener('click', ()=>switchTab(v.dataset.tab));
+});
+switchTab('galaxy');
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pt
+imagenet_class_index.json
+imagenet_labels.json
+.git/
+.gitignore
+*.md
+.env

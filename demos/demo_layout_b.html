@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Demo B · LCD 屏 + 拟物装饰</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+    background: #050816;
+    color: #f1f5f9;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  #starfield { position: fixed; inset:0; z-index:0; }
+  .wrap { position: relative; z-index:1; max-width: 960px; margin: 0 auto; }
+  .title-bar { text-align:center; margin-bottom: 16px; }
+  .title-bar .badge {
+    display:inline-block; font-size:11px; color:#a5b4fc;
+    background:rgba(99,102,241,0.15); padding:3px 10px;
+    border-radius:999px; margin-bottom:6px;
+  }
+  .title-bar h1 { font-size:18px; font-weight:700; }
+  .title-bar p { color:#94a3b8; font-size:12px; margin-top:4px; }
+
+  .turntable-body {
+    background: linear-gradient(135deg, #3d2817, #2a1810, #1f1108);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    border: 1px solid #4a2f1c;
+  }
+  .top-row {
+    display: grid;
+    grid-template-columns: 116px 1fr 280px;
+    gap: 16px;
+    align-items: center;
+  }
+  /* 唱片架 */
+  .vinyl-rack {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #5a3a25;
+    border-radius: 12px;
+    padding: 10px 8px;
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 240px;
+  }
+  .vinyl {
+    width: 96px; height: 96px; border-radius: 50%;
+    background: repeating-radial-gradient(circle at center, #1a1a1a 0, #1a1a1a 2px, #0a0a0a 2px, #0a0a0a 4px);
+    border: 2px solid #000; cursor: pointer;
+    position: relative; transition: transform 0.3s ease;
+  }
+  .vinyl::before { content:''; position:absolute; inset:35%; border-radius:50%; }
+  .vinyl.red::before { background:#e74c3c; }
+  .vinyl.blue::before { background:#3498db; }
+  .vinyl.green::before { background:#27ae60; }
+  .vinyl::after { content:''; position:absolute; left:50%; top:50%; width:6px; height:6px; background:#000; border-radius:50%; transform:translate(-50%,-50%); }
+  .vinyl:hover { transform: scale(1.05); }
+
+  /* 中部 LCD 屏（方案 B 核心）*/
+  .lcd-area {
+    display: flex; flex-direction: column;
+    gap: 12px; align-items: center;
+    justify-content: center;
+    min-height: 240px;
+  }
+  .lcd-screen {
+    width: 100%; max-width: 320px;
+    background: #051914;
+    border: 3px solid #2a3a25;
+    border-radius: 10px;
+    padding: 16px 18px;
+    box-shadow: inset 0 0 30px rgba(0,255,150,0.08), 0 4px 12px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+  }
+  .lcd-screen::before {
+    content:''; position:absolute; inset:0;
+    background: repeating-linear-gradient(0deg,
+      rgba(0,255,150,0.03) 0px, rgba(0,255,150,0.03) 1px,
+      transparent 1px, transparent 3px);
+    pointer-events:none;
+  }
+  .lcd-row {
+    font-family: "Courier New", monospace;
+    color: #4ade80;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 6px rgba(74,222,128,0.7);
+    line-height: 1.6;
+    position: relative;
+  }
+  .lcd-row.small { font-size: 11px; opacity: 0.7; }
+  .lcd-row.muted { color: #16a34a; text-shadow: 0 0 4px rgba(22,163,74,0.5); }
+  .lcd-blink { animation: blink 1.2s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* 旋钮 */
+  .knobs {
+    display: flex; gap: 18px; margin-top: 4px;
+  }
+  .knob {
+    width: 56px; height: 56px;
+    background: radial-gradient(circle at 30% 30%, #5a4a3a, #1a0f08);
+    border-radius: 50%;
+    border: 2px solid #2a1810;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 -3px 6px rgba(0,0,0,0.4);
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.4s ease;
+  }
+  .knob::before {
+    content:''; position:absolute;
+    top: 6px; left: 50%; transform: translateX(-50%);
+    width: 4px; height: 14px;
+    background: #d4af37;
+    border-radius: 2px;
+    box-shadow: 0 0 4px rgba(212,175,55,0.6);
+  }
+  .knob:hover { transform: rotate(45deg); }
+  .knob-label {
+    text-align:center; font-size: 9px;
+    color: #94a3b8; margin-top: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  /* 右侧转盘 */
+  .turntable-deck {
+    position: relative; height: 240px;
+    background: radial-gradient(ellipse at center, #1a0f08, #0a0500);
+    border-radius: 12px; border: 1px solid #4a2f1c;
+  }
+  .platter {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #2a2a2a, #0a0a0a);
+    box-shadow: 0 0 30px rgba(168,85,247,0.3);
+    border: 2px solid #1a1a1a;
+  }
+  .platter::before {
+    content:''; position:absolute; inset:0; border-radius:50%;
+    background: repeating-radial-gradient(circle at center, transparent 0, transparent 4px, rgba(255,255,255,0.03) 4px, rgba(255,255,255,0.03) 5px);
+  }
+  .platter::after { content:''; position:absolute; left:50%; top:50%; width:8px; height:8px; background:#444; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 0 4px rgba(0,0,0,0.8); }
+  .vinyl-active {
+    position: absolute;
+    width: 180px !important; height: 180px !important;
+    top: 50% !important; left: 50% !important;
+    transform: translate(-50%,-50%) !important;
+    animation: spin 4s linear infinite;
+    z-index: 2;
+  }
+  @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+  .tonearm {
+    position: absolute; top: 6px; right: 6px;
+    width: 100px; height: 14px;
+    background: linear-gradient(90deg, #4a4a4a, #2a2a2a);
+    border-radius: 7px;
+    transform-origin: right center;
+    transform: rotate(20deg);
+    transition: transform 0.5s ease;
+    z-index: 3;
+  }
+  .tonearm.active { transform: rotate(38deg); }
+  .tonearm::before { content:''; position:absolute; right:-4px; top:-6px; width:24px; height:24px; background:#3a3a3a; border-radius:50%; border:2px solid #5a5a5a; }
+  .tonearm::after { content:''; position:absolute; left:-4px; top:6px; width:10px; height:8px; background:#d4af37; border-radius:2px; }
+  .bottom-deco { height: 18px; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.4), transparent); border-radius: 4px; margin-top: 12px; display:flex; justify-content:center; align-items:center; gap:4px; }
+  .bottom-deco span { width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,0.1); }
+  .hint { text-align:center; color:#94a3b8; font-size:11px; margin-top:12px; }
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div class="wrap">
+  <div class="title-bar">
+    <span class="badge">方案 B</span>
+    <h1>LCD 屏 + 拟物装饰</h1>
+    <p>中部放 LCD 屏显示当前 tab + 状态 · 配拟物旋钮</p>
+  </div>
+
+  <div class="turntable-body">
+    <div class="top-row">
+      <div class="vinyl-rack">
+        <div class="vinyl red" data-tab="register"></div>
+        <div class="vinyl blue" data-tab="recognize"></div>
+        <div class="vinyl green" data-tab="database"></div>
+      </div>
+
+      <!-- 中部 LCD 屏（方案 B 核心）-->
+      <div class="lcd-area">
+        <div class="lcd-screen">
+          <div class="lcd-row" id="lcd-line1">▶ NOW PLAYING</div>
+          <div class="lcd-row" id="lcd-line2" style="font-size:16px;font-weight:bold;margin:4px 0;">A 面 · 录入新物体</div>
+          <div class="lcd-row small" id="lcd-line3">ResNet-18 · 512 维特征提取</div>
+          <div class="lcd-row muted" id="lcd-line4">[ ●REC ] status: ready<span class="lcd-blink">_</span></div>
+        </div>
+        <div class="knobs">
+          <div>
+            <div class="knob"></div>
+            <div class="knob-label">VOLUME</div>
+          </div>
+          <div>
+            <div class="knob"></div>
+            <div class="knob-label">BASS</div>
+          </div>
+          <div>
+            <div class="knob"></div>
+            <div class="knob-label">TREBLE</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="turntable-deck">
+        <div class="platter" id="platter"></div>
+        <div class="tonearm" id="tonearm"></div>
+      </div>
+    </div>
+    <div class="bottom-deco">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+  <p class="hint">↑ 中部 LCD 屏显示当前 tab 名 + 状态，复古唱片机标配</p>
+</div>
+
+<script>
+const sf = document.getElementById('starfield');
+const sctx = sf.getContext('2d');
+let stars = [];
+function resizeSF(){ sf.width=innerWidth; sf.height=innerHeight;
+  stars = Array.from({length:150},()=>({x:Math.random()*sf.width,y:Math.random()*sf.height,r:Math.random()*1.5+0.3,a:Math.random(),s:Math.random()*0.02+0.005,c:Math.random()<0.3?'#c4b5fd':Math.random()<0.5?'#a5b4fc':'#fff'}));
+}
+resizeSF(); addEventListener('resize',resizeSF);
+function drawSF(){ sctx.clearRect(0,0,sf.width,sf.height);
+  stars.forEach(s=>{ s.a+=s.s; if(s.a>1||s.a<0)s.s=-s.s;
+    sctx.globalAlpha=Math.abs(Math.sin(s.a*3.14));
+    sctx.fillStyle=s.c; sctx.beginPath(); sctx.arc(s.x,s.y,s.r,0,7); sctx.fill(); });
+  requestAnimationFrame(drawSF);
+}
+drawSF();
+
+const tabs = {
+  register: { side:'A', title:'录入新物体', sub:'ResNet-18 · 512 维特征提取', status:'ready' },
+  recognize: { side:'B', title:'识别物体', sub:'特征库检索 · 余弦相似度 ≥ 0.75', status:'scanning' },
+  database: { side:'C', title:'特征库管理', sub:'已存 3 物体 · 12 张图片 · 512 维', status:'browsing' }
+};
+const platter = document.getElementById('platter');
+const tonearm = document.getElementById('tonearm');
+
+function switchTab(tab) {
+  const t = tabs[tab];
+  document.getElementById('lcd-line2').textContent = `${t.side} 面 · ${t.title}`;
+  document.getElementById('lcd-line3').textContent = t.sub;
+  document.getElementById('lcd-line4').innerHTML = `[ ●REC ] status: ${t.status}<span class="lcd-blink">_</span>`;
+
+  document.querySelectorAll('.vinyl').forEach(v=>{
+    v.classList.remove('vinyl-active');
+    v.style.cssText = '';
+  });
+  const colorMap = {register:'red',recognize:'blue',database:'green'};
+  const src = document.querySelector(`.vinyl.${colorMap[tab]}`);
+  if (src) {
+    platter.querySelectorAll('.vinyl-active').forEach(c=>c.remove());
+    const clone = src.cloneNode(true);
+    clone.classList.add('vinyl-active');
+    clone.removeAttribute('data-tab');
+    platter.appendChild(clone);
+  }
+  tonearm.classList.add('active');
+}
+document.querySelectorAll('.vinyl').forEach(v=>{
+  v.addEventListener('click', ()=>switchTab(v.dataset.tab));
+});
+switchTab('register');
+</script>
+</body>
+</html>

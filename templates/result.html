@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>识别结果 · ResNet-18</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --border: #334155;
+      --gold: #fbbf24;
+      --silver: #cbd5e1;
+      --bronze: #d97706;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, var(--bg) 0%, #1a1a2e 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .container { width: 100%; max-width: 620px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .topbar h1 { font-size: 1.3rem; font-weight: 700; }
+    .back {
+      color: var(--accent-hover);
+      text-decoration: none;
+      font-size: 0.88rem;
+      padding: 0.4rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .back:hover { border-color: var(--accent); background: rgba(99,102,241,0.1); }
+
+    .image-section {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .image-section img {
+      max-width: 100%;
+      max-height: 280px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .image-section .filename {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+
+    .results {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .result-item {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1.1rem;
+      transition: border-color 0.2s;
+    }
+    .result-item.rank-1 { border-color: rgba(251, 191, 36, 0.4); }
+    .result-item.rank-2 { border-color: rgba(203, 213, 225, 0.3); }
+    .result-item.rank-3 { border-color: rgba(217, 119, 6, 0.3); }
+
+    .result-item .label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .result-item .label {
+      font-size: 1rem;
+      font-weight: 600;
+      text-transform: capitalize;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .result-item .label-zh {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: none;
+      margin-top: 0.15rem;
+    }
+    .rank-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+    }
+    .rank-1 .rank-badge { background: rgba(251,191,36,0.15); color: var(--gold); }
+    .rank-2 .rank-badge { background: rgba(203,213,225,0.15); color: var(--silver); }
+    .rank-3 .rank-badge { background: rgba(217,119,6,0.15); color: var(--bronze); }
+
+    .result-item .confidence {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent-hover);
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(51, 65, 85, 0.6);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .rank-1 .progress { background: linear-gradient(90deg, #f59e0b, var(--gold)); }
+    .rank-2 .progress { background: linear-gradient(90deg, #64748b, var(--silver)); }
+    .rank-3 .progress { background: linear-gradient(90deg, #b45309, var(--bronze)); }
+    .btn-retry {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 0.8rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-top: 1.75rem;
+      transition: background 0.2s;
+    }
+    .btn-retry:hover { background: var(--accent-hover); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="topbar">
+        <h1>识别结果</h1>
+        <a href="/" class="back">← 重新上传</a>
+      </div>
+
+      {% if preview_b64 %}
+      <div class="image-section">
+        <img src="data:image/jpeg;base64,{{ preview_b64 }}" alt="上传图片" />
+        {% if filename %}<div class="filename">{{ filename }}</div>{% endif %}
+      </div>
+      {% endif %}
+
+      <div class="section-title">Top-3 可能类别</div>
+
+      <div class="results">
+        {% for r in results %}
+        {% set rank = loop.index %}
+        <div class="result-item rank-{{ rank }}">
+          <div class="label-row">
+            <div class="label">
+              <span class="rank-badge">#{{ rank }}</span>
+              {{ r.label }}
+            </div>
+            <span class="confidence">{{ "%.2f"|format(r.score * 100) }}%</span>
+          </div>
+          {% if r.label_zh %}<div class="label-zh">{{ r.label_zh }}</div>{% endif %}
+          <div class="progress-bar">
+            <div class="progress" style="width: {{ r.score * 100 }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <a href="/" class="btn-retry">上传新图片</a>
+    </div>
+  </div>
+
+  <script>
+    // 进度条入场动画：先设为 0 再过渡到目标值
+    document.querySelectorAll('.progress').forEach(bar => {
+      const w = bar.style.width;
+      bar.style.width = '0';
+      requestAnimationFrame(() => requestAnimationFrame(() => bar.style.width = w));
+    });
+  </script>
+</body>
+</html>

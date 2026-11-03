@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+.idea/
+.screenshots/
+
+# 模型权重（运行 prepare_model.py 重新生成）
+*.pt
+
+# 本地特征库与录入的图片
+feature_db.pkl
+feature_db.pkl.*
+feature_images/
+
+# 遗留文件
+aaa

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Demo A · panel 嵌入机身</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+    background: #050816;
+    color: #f1f5f9;
+    min-height: 100vh;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+  #starfield { position: fixed; inset:0; z-index:0; }
+  .wrap {
+    position: relative; z-index:1;
+    max-width: 960px; margin: 0 auto;
+  }
+  .title-bar {
+    text-align:center; margin-bottom: 16px;
+  }
+  .title-bar .badge {
+    display:inline-block; font-size:11px; color:#a5b4fc;
+    background:rgba(99,102,241,0.15); padding:3px 10px;
+    border-radius:999px; letter-spacing:0.05em; margin-bottom:6px;
+  }
+  .title-bar h1 { font-size:18px; font-weight:700; }
+  .title-bar p { color:#94a3b8; font-size:12px; margin-top:4px; }
+
+  /* 唱片机机身 */
+  .turntable-body {
+    background: linear-gradient(135deg, #3d2817 0%, #2a1810 50%, #1f1108 100%);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+    position: relative;
+    border: 1px solid #4a2f1c;
+  }
+  /* 顶部：唱片区（rack + deck）*/
+  .top-row {
+    display: grid;
+    grid-template-columns: 116px 1fr 280px;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  /* 唱片架 */
+  .vinyl-rack {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #5a3a25;
+    border-radius: 12px;
+    padding: 10px 8px;
+    display: flex; flex-direction: column;
+    gap: 8px;
+    position: relative;
+    min-height: 240px;
+  }
+  .vinyl {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    background: repeating-radial-gradient(circle at center,
+      #1a1a1a 0px, #1a1a1a 2px,
+      #0a0a0a 2px, #0a0a0a 4px);
+    border: 2px solid #000;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+  .vinyl::before {
+    content:''; position:absolute; inset:35%;
+    border-radius:50%;
+  }
+  .vinyl.red::before { background:#e74c3c; }
+  .vinyl.blue::before { background:#3498db; }
+  .vinyl.green::before { background:#27ae60; }
+  .vinyl::after {
+    content:''; position:absolute; left:50%; top:50%;
+    width:6px; height:6px; background:#000;
+    border-radius:50%; transform:translate(-50%,-50%);
+  }
+  .vinyl:hover { transform: scale(1.05); }
+
+  /* 中部 panel 嵌入区（方案 A 核心）*/
+  .panel-area {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid #4a2f1c;
+    border-radius: 12px;
+    padding: 18px;
+    min-height: 240px;
+    backdrop-filter: blur(8px);
+    position: relative;
+  }
+  .panel-area::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    border-radius: 12px 12px 0 0;
+  }
+  .panel-area.theme-galaxy::before { background: linear-gradient(90deg, transparent, #a855f7, transparent); }
+  .panel-area.theme-forest::before { background: linear-gradient(90deg, transparent, #22c55e, transparent); }
+  .panel-area.theme-beach::before { background: linear-gradient(90deg, transparent, #38bdf8, transparent); }
+  .panel-area h2 {
+    font-size: 14px; font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .panel-area.theme-galaxy h2 { color: #c4b5fd; }
+  .panel-area.theme-forest h2 { color: #86efac; }
+  .panel-area.theme-beach h2 { color: #7dd3fc; }
+  .panel-area .desc {
+    color: #94a3b8; font-size: 11px; margin-bottom: 12px;
+  }
+  .field-label { font-size: 11px; color:#94a3b8; margin-bottom:4px; }
+  .field-input {
+    width: 100%; background: rgba(0,0,0,0.3);
+    border: 1px solid #334155; border-radius: 6px;
+    padding: 8px 10px; color: #f1f5f9; font-size: 12px;
+    margin-bottom: 10px;
+  }
+  .drop-zone {
+    border: 2px dashed #4a5568; border-radius: 8px;
+    padding: 16px; text-align: center;
+    color: #94a3b8; font-size: 11px;
+    margin-bottom: 10px;
+  }
+  .btn-primary {
+    width: 100%; padding: 8px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  /* 识别 panel 简化版 */
+  .recog-mock {
+    background: rgba(0,0,0,0.3); border-radius: 8px;
+    padding: 12px; text-align:center;
+    color: #94a3b8; font-size: 11px;
+  }
+  /* 特征库 mock */
+  .db-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px; margin-bottom: 10px;
+  }
+  .db-stat-card {
+    background: rgba(0,0,0,0.3); border-radius: 6px;
+    padding: 8px; text-align:center;
+  }
+  .db-stat-card .v { font-size: 16px; font-weight:700; color:#a5b4fc; }
+  .db-stat-card .l { font-size: 10px; color:#94a3b8; }
+  .db-row {
+    background: rgba(0,0,0,0.2); padding: 6px 8px;
+    border-radius: 4px; font-size: 11px;
+    display: flex; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  /* 右侧 deck */
+  .turntable-deck {
+    position: relative;
+    height: 240px;
+    background: radial-gradient(ellipse at center, #1a0f08, #0a0500);
+    border-radius: 12px;
+    border: 1px solid #4a2f1c;
+  }
+  .platter {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #2a2a2a, #0a0a0a);
+    box-shadow: 0 0 30px rgba(168,85,247,0.3), inset 0 0 20px rgba(0,0,0,0.5);
+    border: 2px solid #1a1a1a;
+  }
+  .platter::before {
+    content:''; position:absolute; inset:0;
+    border-radius:50%;
+    background: repeating-radial-gradient(circle at center,
+      transparent 0, transparent 4px,
+      rgba(255,255,255,0.03) 4px, rgba(255,255,255,0.03) 5px);
+  }
+  .platter::after {
+    content:''; position:absolute; left:50%; top:50%;
+    width:8px; height:8px; background:#444;
+    border-radius:50%; transform:translate(-50%,-50%);
+    box-shadow: 0 0 4px rgba(0,0,0,0.8);
+  }
+  /* 飞入的活跃唱片 */
+  .vinyl-active {
+    position: absolute;
+    width: 180px !important; height: 180px !important;
+    top: 50% !important; left: 50% !important;
+    transform: translate(-50%,-50%) !important;
+    animation: spin 4s linear infinite;
+    z-index: 2;
+  }
+  @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+  .tonearm {
+    position: absolute; top: 6px; right: 6px;
+    width: 100px; height: 14px;
+    background: linear-gradient(90deg, #4a4a4a, #2a2a2a);
+    border-radius: 7px;
+    transform-origin: right center;
+    transform: rotate(20deg);
+    transition: transform 0.5s ease;
+    z-index: 3;
+  }
+  .tonearm.active { transform: rotate(38deg); }
+  .tonearm::before {
+    content:''; position:absolute; right:-4px; top:-6px;
+    width:24px; height:24px; background: #3a3a3a;
+    border-radius: 50%;
+    border: 2px solid #5a5a5a;
+  }
+  .tonearm::after {
+    content:''; position:absolute; left:-4px; top:6px;
+    width:10px; height:8px; background: #d4af37;
+    border-radius: 2px;
+  }
+
+  /* 底部装饰 */
+  .bottom-deco {
+    height: 18px;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.4), transparent);
+    border-radius: 4px;
+    margin-top: 12px;
+    display: flex; justify-content: center; align-items: center; gap: 4px;
+  }
+  .bottom-deco span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+  }
+  .hint {
+    text-align:center; color:#94a3b8; font-size:11px;
+    margin-top: 12px;
+  }
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div class="wrap">
+  <div class="title-bar">
+    <span class="badge">方案 A</span>
+    <h1>panel 嵌入唱片机机身</h1>
+    <p>点击左侧唱片 → 唱片飞到转盘 + 中部 panel 内容同步切换</p>
+  </div>
+
+  <div class="turntable-body">
+    <div class="top-row">
+      <!-- 唱片架 -->
+      <div class="vinyl-rack">
+        <div class="vinyl red" data-tab="register"></div>
+        <div class="vinyl blue" data-tab="recognize"></div>
+        <div class="vinyl green" data-tab="database"></div>
+      </div>
+
+      <!-- 中部 panel 区（方案 A 核心）-->
+      <div class="panel-area theme-galaxy" id="panel-area">
+        <!-- 内容由 JS 注入 -->
+      </div>
+
+      <!-- 右侧转盘 -->
+      <div class="turntable-deck">
+        <div class="platter" id="platter"></div>
+        <div class="tonearm" id="tonearm"></div>
+      </div>
+    </div>
+
+    <div class="bottom-deco">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <p class="hint">↑ 中部 panel 直接嵌在机身里，跟唱片机是一体的</p>
+</div>
+
+<script>
+// 星空背景
+const sf = document.getElementById('starfield');
+const sctx = sf.getContext('2d');
+let stars = [];
+function resizeSF() {
+  sf.width = innerWidth; sf.height = innerHeight;
+  stars = Array.from({length:150}, () => ({
+    x: Math.random()*sf.width, y: Math.random()*sf.height,
+    r: Math.random()*1.5+0.3, a: Math.random(),
+    s: Math.random()*0.02+0.005,
+    c: Math.random()<0.3?'#c4b5fd':Math.random()<0.5?'#a5b4fc':'#fff'
+  }));
+}
+resizeSF(); addEventListener('resize', resizeSF);
+function drawSF() {
+  sctx.clearRect(0,0,sf.width,sf.height);
+  stars.forEach(s => {
+    s.a += s.s; if (s.a>1||s.a<0) s.s=-s.s;
+    sctx.globalAlpha = Math.abs(Math.sin(s.a*3.14));
+    sctx.fillStyle = s.c;
+    sctx.beginPath();
+    sctx.arc(s.x, s.y, s.r, 0, 7);
+    sctx.fill();
+  });
+  requestAnimationFrame(drawSF);
+}
+drawSF();
+
+// panel 内容模板
+const panels = {
+  register: {
+    theme: 'theme-galaxy',
+    html: `
+      <h2>录入新物体</h2>
+      <div class="desc">ResNet-18 提取 512 维特征 · 录入即「刻录唱片」</div>
+      <div class="field-label">物体名称</div>
+      <input class="field-input" placeholder="例如：水杯、手机、钥匙…" />
+      <div class="drop-zone">📁 拖拽图片到此处，或点击上传<br><small>支持 JPG / PNG · 建议 5 张以上</small></div>
+      <button class="btn-primary">录入物体</button>
+    `
+  },
+  recognize: {
+    theme: 'theme-forest',
+    html: `
+      <h2>识别物体</h2>
+      <div class="desc">特征库检索 · 余弦相似度 ≥ 0.75 命中</div>
+      <div class="recog-mock" style="height:90px;display:flex;align-items:center;justify-content:center;">
+        📷 摄像头预览区（拍照识别）<br>或下方上传图片
+      </div>
+      <div style="margin-top:8px;">
+        <div class="field-label">或上传图片</div>
+        <div class="drop-zone" style="padding:8px;">📁 点击上传图片</div>
+      </div>
+      <button class="btn-primary" style="background:linear-gradient(135deg,#22c55e,#16a34a);">开始识别</button>
+    `
+  },
+  database: {
+    theme: 'theme-beach',
+    html: `
+      <h2>特征库管理</h2>
+      <div class="desc">已存物体特征 · 可查看 / 删除</div>
+      <div class="db-stats">
+        <div class="db-stat-card"><div class="v">3</div><div class="l">物体</div></div>
+        <div class="db-stat-card"><div class="v">12</div><div class="l">图片</div></div>
+        <div class="db-stat-card"><div class="v">512</div><div class="l">维</div></div>
+      </div>
+      <div class="db-row"><span>🥤 水杯</span><span>5 张</span></div>
+      <div class="db-row"><span>📱 手机</span><span>4 张</span></div>
+      <div class="db-row"><span>🔑 钥匙</span><span>3 张</span></div>
+    `
+  }
+};
+
+const panelArea = document.getElementById('panel-area');
+const platter = document.getElementById('platter');
+const tonearm = document.getElementById('tonearm');
+
+function switchTab(tab) {
+  // 更新 panel
+  const p = panels[tab];
+  panelArea.className = 'panel-area ' + p.theme;
+  panelArea.innerHTML = p.html;
+
+  // 重置所有唱片
+  document.querySelectorAll('.vinyl').forEach(v => {
+    v.classList.remove('vinyl-active');
+    v.style.position = '';
+    v.style.top = '';
+    v.style.left = '';
+    v.style.width = '';
+    v.style.height = '';
+    v.style.transform = '';
+  });
+  // 飞入 active 唱片（克隆到 platter）
+  const active = document.querySelector(`.vinyl.${tab === 'register'?'red':tab === 'recognize'?'blue':'green'}`);
+  if (active) {
+    const clone = active.cloneNode(true);
+    clone.classList.add('vinyl-active');
+    clone.removeAttribute('data-tab');
+    // 移除之前的 clone
+    platter.querySelectorAll('.vinyl-active').forEach(c => c.remove());
+    platter.appendChild(clone);
+  }
+  tonearm.classList.add('active');
+}
+
+document.querySelectorAll('.vinyl').forEach(v => {
+  v.addEventListener('click', () => switchTab(v.dataset.tab));
+});
+
+// 默认显示录入
+switchTab('register');
+</script>
+</body>
+</html>
