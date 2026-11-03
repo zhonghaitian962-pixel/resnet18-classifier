@@ -53,7 +53,7 @@ python feature_app.py
 
 请使用 `localhost` 访问，不要用局域网 IP：摄像头与语音识别在非安全上下文中会被浏览器禁用。
 
-Windows 也可以双击 `run.bat`，但需要先把里面的 `C:\resnet18-classifier` 改成你的实际项目路径。
+Windows 也可以双击 `run.bat`：脚本会自动定位同目录的 `venv` 或系统 Python，缺依赖时自动安装，首次运行自动生成模型，然后启动服务并打开浏览器。
 
 ## 使用流程（特征库 Demo）
 
@@ -75,6 +75,22 @@ Windows 也可以双击 `run.bat`，但需要先把里面的 `C:\resnet18-classi
 | 图片目录 | `feature_images/<物体名>/<编号>.jpg` |
 | 备份 / 迁移 | 同时拷贝 `feature_db.pkl` 和 `feature_images/` 即可 |
 | 重置特征库 | 页面里点「清空全部特征库」，或删除上述文件与目录 |
+
+## 把项目发给朋友
+
+**推荐：直接发 GitHub 仓库或 ZIP 下载链接**（代码随仓库更新，不用来回传压缩包）：
+
+- 仓库：https://github.com/zhonghaitian962-pixel/resnet18-classifier
+- ZIP：https://github.com/zhonghaitian962-pixel/resnet18-classifier/archive/refs/heads/main.zip
+
+如果一定要发本地压缩包，请注意：
+
+1. **压缩整个项目文件夹**，不要只发 `run.bat`（脚本需要同目录的 `feature_app.py`、`templates/` 等）。
+2. 对方**先完整解压**，再进入文件夹双击 `run.bat`；不要直接在压缩包预览窗口里运行。
+3. 对方电脑需要安装 **Python 3.9 ~ 3.11**（安装时勾选“Add python.exe to PATH”），首次运行需要联网下载依赖和模型。
+4. **不要打包 `venv/`**：虚拟环境与打包电脑绑定，换机可能失效，而且体积很大。`run.bat` 会自动用系统 Python 安装依赖。
+5. 解压路径尽量用英文，中文路径可能导致 TorchScript 加载模型失败。
+6. 仓库/压缩包不含 `*.pt` 模型和 `feature_db.pkl`，属于正常现象；`run.bat` 首次运行会自动执行 `prepare_model.py`。
 
 ## Docker（仅分类 Demo）
 
